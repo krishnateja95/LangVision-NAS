@@ -3,11 +3,11 @@
 
 from functools import partial
 
-from grammar_dataset.grammar_dataset import get_dataset as get_grammar_dataset
-from alpaca_dataset import InstructionDataset as get_alpaca_dataset
-from custom_dataset import get_custom_dataset,get_data_collator
-from samsum_dataset import get_preprocessed_samsum as get_samsum_dataset
-from toxicchat_dataset import get_llamaguard_toxicchat_dataset as get_llamaguard_toxicchat_dataset
+from .grammar_dataset.grammar_dataset import get_dataset as get_grammar_dataset
+from .alpaca_dataset import InstructionDataset as get_alpaca_dataset
+from .custom_dataset import get_custom_dataset,get_data_collator
+from .samsum_dataset import get_preprocessed_samsum as get_samsum_dataset
+from .toxicchat_dataset import get_llamaguard_toxicchat_dataset as get_llamaguard_toxicchat_dataset
 DATASET_PREPROC = {
     "alpaca_dataset": partial(get_alpaca_dataset),
     "grammar_dataset": get_grammar_dataset,

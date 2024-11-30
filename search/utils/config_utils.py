@@ -19,7 +19,7 @@ import sys
 sys.path.append("..")
 from configs import datasets, lora_config, llama_adapter_config, prefix_config, train_config
 from data.sampler import LengthBasedBatchSampler, DistributedLengthBasedBatchSampler
-from datasets import DATASET_PREPROC
+from custom_data import DATASET_PREPROC
 
 def update_config(config, **kwargs):
     if isinstance(config, (tuple, list)):

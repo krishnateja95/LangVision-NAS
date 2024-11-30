@@ -7,7 +7,7 @@ import sys
 sys.path.append("..")
 
 from data.concatenator import ConcatDataset
-from datasets import DATASET_PREPROC, DATALOADER_COLLATE_FUNC
+from custom_data import DATASET_PREPROC, DATALOADER_COLLATE_FUNC
 from utils.config_utils import get_dataloader_kwargs
 
 

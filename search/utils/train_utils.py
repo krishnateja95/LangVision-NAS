@@ -1,5 +1,3 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# This software may be used and distributed according to the terms of the Llama 2 Community License Agreement.
 
 import os
 import time
@@ -38,7 +36,6 @@ def profile(cfg, local_rank=None):
     if use_flop_counter and use_profiler:
         raise ValueError("Cannot use both profiler and flop counter")
     if use_profiler:
-        # profiler needs a warmup stage to get the accurate profiling results
         wait_step, warmup_step, active_step = 1, 2, 3
         min_step = wait_step + warmup_step + active_step + 1
         if cfg.max_train_step > 0 and cfg.max_train_step < min_step:
@@ -70,24 +67,6 @@ def profile(cfg, local_rank=None):
 
 
 def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_scheduler, gradient_accumulation_steps, train_config, fsdp_config=None, local_rank=None, rank=None, wandb_run=None):
-    """
-    Trains the model on the given dataloader
-
-    Args:
-        model: The model to be trained
-        train_dataloader: The dataloader containing the training data
-        optimizer: The optimizer used for training
-        lr_scheduler: The learning rate scheduler
-        gradient_accumulation_steps: The number of steps to accumulate gradients before performing a backward/update operation
-        num_epochs: The number of epochs to train for
-        local_rank: The rank of the current node in a distributed setting
-        train_config: The training configuration
-        eval_dataloader: The dataloader containing the eval data
-        tokenizer: tokenizer used in the eval for decoding the predicitons
-
-    Returns: results dictionary containing average training and validation perplexity and loss
-    """
-    # Create a gradient scaler for fp16
     if train_config.use_fp16 and train_config.enable_fsdp:
         scaler = ShardedGradScaler()
     elif train_config.use_fp16 and not train_config.enable_fsdp:
@@ -117,16 +96,15 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
     results = {}
     best_val_loss = float("inf")
     total_train_steps = 0
-    max_steps_reached = False  # Flag to indicate max training steps reached
-    # Start the training loop
+    max_steps_reached = False
+    
     for epoch in range(train_config.num_epochs):
         print(f"Starting epoch {epoch}/{train_config.num_epochs}")
         print(f"train_config.max_train_step: {train_config.max_train_step}")
-        # stop when the maximum number of training steps is reached
         if max_steps_reached:
             break
         epoch_start_time = time.perf_counter()
-        with MemoryTrace() as memtrace:  # track the memory usage
+        with MemoryTrace() as memtrace:
             model.train()
             total_loss = 0.0
             total_length = len(train_dataloader)//gradient_accumulation_steps
@@ -134,7 +112,6 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
             with profile(train_config,local_rank) as profile_context:
                 for step, batch in enumerate(train_dataloader):
                     total_train_steps += 1
-                    # stop when the maximum number of training steps is reached
                     if train_config.max_train_step > 0 and total_train_steps > train_config.max_train_step:
                         max_steps_reached = True
                         if not train_config.enable_fsdp or local_rank==0:
@@ -159,7 +136,6 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                         train_step_loss.append(loss.detach().float().item())
                         train_step_perplexity.append(float(torch.exp(loss.detach().float())))
                     if train_config.use_fp16:
-                        # if fp16 is enabled, use gradient scaler to handle gradient update
                         scaler.scale(loss).backward()
                         if (step + 1) % gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
                             if train_config.gradient_clipping and train_config.gradient_clipping_threshold > 0.0:
@@ -173,7 +149,6 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
                             optimizer.zero_grad()
                             pbar.update(1)
                     else:
-                        # regular backpropagation when fp16 is not used
                         loss.backward()
                         if (step + 1) % gradient_accumulation_steps == 0 or step == len(train_dataloader) - 1:
                             if train_config.gradient_clipping and train_config.gradient_clipping_threshold > 0.0:
@@ -321,24 +296,13 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         results["metrics_filename"] = metrics_filename
     if train_config.flop_counter:
         results["model_tflops"]= TFlops
-    #saving the training params including fsdp setting for reference.
+    
     if train_config.enable_fsdp and not train_config.use_peft and rank==0:
         save_train_params(train_config, fsdp_config, rank)
 
     return results
 
 def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb_run):
-    """
-    Evaluates the model on the given dataloader
-
-    Args:
-        model: The model to evaluate
-        eval_dataloader: The dataloader containing the evaluation data
-        local_rank: The rank of the current node in a distributed setting
-        tokenizer: The tokenizer used to decode predictions
-
-    Returns: eval_ppl, eval_epoch_loss
-    """
     if train_config.enable_fsdp:
         world_size = int(os.environ["WORLD_SIZE"])
     model.eval()
@@ -363,9 +327,8 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb
                         batch[key] = batch[key].to('xpu:0')
                     else:
                         batch[key] = batch[key].to('cuda:0')
-            # Ensure no gradients are computed for this scope to save memory
+            
             with torch.no_grad():
-                # Forward pass and compute loss
                 outputs = model(**batch)
                 loss = outputs.loss
                 if train_config.save_metrics:
@@ -373,13 +336,12 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb
                     val_step_perplexity.append(float(torch.exp(loss.detach().float())))
 
                 eval_loss += loss.detach().float()
-            # Decode predictions and add to evaluation predictions list
+            
             preds = torch.argmax(outputs.logits, -1)
             eval_preds.extend(
                 tokenizer.batch_decode(preds.detach().cpu().numpy(), skip_special_tokens=True)
             )
-
-    # If there's more than one CUDA device, reduce evaluation loss across all devices
+    
     if is_xpu_available() and (torch.xpu.device_count() > 1 and train_config.enable_fsdp):
         dist.all_reduce(eval_loss, op=dist.ReduceOp.SUM)
     if torch.cuda.device_count() > 1 and train_config.enable_fsdp:
@@ -413,9 +375,6 @@ def freeze_transformer_layers(model, num_layer):
                     param.requires_grad = False
                     
 def freeze_LLM_only(model):
-    """
-    Freeze self-attention layers in the language_model. vision_model, multi_modal_projector, and cross-attention layers will be fine-tuned
-    """
     for name, param in model.language_model.named_parameters():
                 param.requires_grad = False
     for i, layer in enumerate(model.language_model.model.layers):
@@ -442,10 +401,6 @@ def setup_environ_flags(rank):
     """Set environment flags for debugging purposes"""
     os.environ["TORCH_SHOW_CPP_STACKTRACES"] = str(1)
     os.environ["NCCL_ASYNC_ERROR_HANDLING"] = str(1)
-    # os.environ["TORCH_DISTRIBUTED_DEBUG"] = "DETAIL"
-    # This flag will help with CUDA memory fragmentations that can lead into OOM in some cases.
-    # Note this is only available in PyTorch Nighlies (as of July 30 2023)
-    # os.environ['PYTORCH_CUDA_ALLOC_CONF']='expandable_segments:True'
     if rank == 0:
         print(f"--> Running with torch dist debug set to detail")
 
@@ -591,18 +546,16 @@ def save_train_params(train_config, fsdp_config, rank):
     )
 
     save_dir = Path.cwd() / folder_name
-    # If the directory does not exist, create it
+    
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    # Convert the dictionary to a YAML string
+    
     config_yaml = yaml.dump(train_params_dict, indent=4)
     file_name = os.path.join(save_dir,'train_params.yaml')
 
-    # Check if there's a directory with the same name as the file
     if os.path.isdir(file_name):
         print(f"Error: {file_name} is a directory, not a file.")
     else:
-        # Write the YAML string to the file
         with open(file_name, 'w') as f:
             f.write(config_yaml)
         if rank==0:

@@ -56,9 +56,13 @@ from transformers import (
     AutoTokenizer,
     BitsAndBytesConfig,
     LlamaForCausalLM,
-    MllamaForConditionalGeneration,
+    # MllamaForConditionalGeneration,
 )
+
+
+
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
+
 from transformers.models.mllama.modeling_mllama import (
     MllamaCrossAttentionDecoderLayer,
     MllamaSelfAttentionDecoderLayer,
@@ -86,10 +90,10 @@ def setup_wandb(train_config, fsdp_config, **kwargs):
 
 
 def main(**kwargs):
-    # Update the configuration for the training and sharding process
+    
     train_config, fsdp_config = TRAIN_CONFIG(), FSDP_CONFIG()
     update_config((train_config, fsdp_config), **kwargs)
-    # Set the seeds for reproducibility
+    
     if is_xpu_available():
         torch.xpu.manual_seed(train_config.seed)
     torch.manual_seed(train_config.seed)
@@ -98,7 +102,7 @@ def main(**kwargs):
 
     if train_config.enable_fsdp:
         setup()
-        # torchrun specific
+        
         local_rank = int(os.environ["LOCAL_RANK"])
         rank = int(os.environ["RANK"])
         world_size = int(os.environ["WORLD_SIZE"])
@@ -117,7 +121,6 @@ def main(**kwargs):
         if not train_config.enable_fsdp or rank == 0:
             wandb_run = setup_wandb(train_config, fsdp_config, **kwargs)
 
-    # setting quantization configs
     bnb_config = None
     if train_config.quantization:
         if type(train_config.quantization) == type(True):
@@ -136,11 +139,11 @@ def main(**kwargs):
         update_config(quant_config, **kwargs)
         bnb_config = quant_config.create_bnb_config(train_config.quantization)
 
-    # Load the pre-trained model and setup its configuration
     use_cache = False if train_config.enable_fsdp else None
     config = AutoConfig.from_pretrained(train_config.model_name)
     if config.model_type == "mllama":
         is_vision = True
+        
         model = MllamaForConditionalGeneration.from_pretrained(
             train_config.model_name,
             quantization_config=bnb_config,
@@ -152,6 +155,7 @@ def main(**kwargs):
             ),
             torch_dtype=torch.float16 if train_config.use_fp16 else torch.bfloat16,
         )
+        
         processor = AutoProcessor.from_pretrained(
             train_config.model_name
             if train_config.tokenizer_name is None
@@ -160,6 +164,7 @@ def main(**kwargs):
         processor.tokenizer.padding_side = "right"
         model.supports_gradient_checkpointing = True
         model.language_model.supports_gradient_checkpointing = True
+
     elif config.model_type == "llama":
         is_vision = False
         model = LlamaForCausalLM.from_pretrained(
@@ -178,7 +183,7 @@ def main(**kwargs):
         raise ValueError(
             f"Model type {config.model_type} is not supported. Please use llama or mllama model."
         )
-    # Load the tokenizer and add special tokens
+    
     tokenizer = AutoTokenizer.from_pretrained(
         train_config.model_name
         if train_config.tokenizer_name is None
@@ -187,8 +192,6 @@ def main(**kwargs):
     if not tokenizer.pad_token_id:
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
-    # If there is a mismatch between tokenizer vocab size and embedding matrix,
-    # throw a warning and then expand the embedding matrix
     if len(tokenizer) > model.get_input_embeddings().weight.shape[0]:
         print(
             "WARNING: Resizing the embedding matrix to match the tokenizer vocab size."
@@ -197,7 +200,6 @@ def main(**kwargs):
 
     print_model_size(model, train_config, rank if train_config.enable_fsdp else 0)
     
-    # Convert the model to bfloat16 if fsdp and pure_bf16 is enabled
     if (
         train_config.enable_fsdp
         and fsdp_config.pure_bf16
@@ -206,13 +208,11 @@ def main(**kwargs):
         model.to(torch.bfloat16)
 
     if train_config.use_peft:
-        # Load the pre-trained peft model checkpoint and setup its configuration
         if train_config.from_peft_checkpoint:
             model = PeftModel.from_pretrained(
                 model, train_config.from_peft_checkpoint, is_trainable=True
             )
             peft_config = model.peft_config
-        # Generate the peft config and start fine-tuning from original model
         else:
             peft_config = generate_peft_config(train_config, kwargs)
             model = get_peft_model(model, peft_config)
@@ -231,22 +231,18 @@ def main(**kwargs):
         )
         print("HSDP device mesh is ready")
 
-    # setting up FSDP if enable_fsdp is enabled
     if train_config.enable_fsdp:
         check_fsdp_config(fsdp_config)
 
         if not train_config.use_peft and train_config.freeze_layers:
             freeze_transformer_layers(model, train_config.num_freeze_layers)
-            # print model size and frozen layers after freezing layers
             print_frozen_model_status(model, train_config, rank if train_config.enable_fsdp else 0)
             
         if not train_config.use_peft and train_config.freeze_LLM_only and config.model_type == "mllama":
             freeze_LLM_only(model)
-            # print model size and frozen layers after freezing layers
             print_frozen_model_status(model, train_config, rank if train_config.enable_fsdp else 0)
         
         mixed_precision_policy, wrapping_policy = get_policies(fsdp_config, rank)
-        # Create the FSDP wrapper for MllamaSelfAttentionDecoderLayer,MllamaCrossAttentionDecoderLayer,MllamaVisionEncoderLayer in vision models
         if is_vision:
             my_auto_wrapping_policy = fsdp_auto_wrap_policy(
                 model,
@@ -257,7 +253,6 @@ def main(**kwargs):
                 ],
             )
         else:
-            # Create the FSDP wrapper for LlamaDecoderLayer in text models
             my_auto_wrapping_policy = fsdp_auto_wrap_policy(model, [LlamaDecoderLayer])
         device_id = 0
         if is_xpu_available():
@@ -313,8 +308,6 @@ def main(**kwargs):
     else:
         dataset_processer = tokenizer
     
-    # Load and preprocess the dataset for training and validation
-
     dataset_train = get_preprocessed_dataset(
         dataset_processer,
         dataset_config,
@@ -347,7 +340,7 @@ def main(**kwargs):
     if custom_data_collator:
         print("custom_data_collator is used")
         train_dl_kwargs["collate_fn"] = custom_data_collator
-    # Create DataLoaders for the training and validation dataset
+    
     train_dataloader = torch.utils.data.DataLoader(
         dataset_train,
         num_workers=train_config.num_workers_dataloader,
@@ -386,7 +379,6 @@ def main(**kwargs):
         else:
             print(f"--> Num of Validation Set Batches loaded = {len(eval_dataloader)}")
 
-    # Initialize the optimizer and learning rate scheduler
     if fsdp_config.pure_bf16 and fsdp_config.optimizer == "anyprecision":
         optimizer = AnyPrecisionAdamW(
             model.parameters(),

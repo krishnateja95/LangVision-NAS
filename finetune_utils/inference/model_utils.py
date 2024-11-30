@@ -2,9 +2,11 @@
 # This software may be used and distributed according to the terms of the GNU General Public License version 3.
 
 from warnings import warn
+import sys
+sys.path.append("..")
+from configs import quantization_config as QUANT_CONFIG
+from utils.config_utils import update_config
 
-from finetune_utils.configs import quantization_config as QUANT_CONFIG
-from finetune_utils.utils.config_utils import update_config
 from peft import PeftModel
 from transformers import (
     AutoConfig,

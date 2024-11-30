@@ -13,29 +13,29 @@ import torch
 import torch.optim as optim
 from accelerate.utils import is_xpu_available
 
-from finetune_utils.configs import (
+from configs import (
     fsdp_config as FSDP_CONFIG,
     quantization_config as QUANTIZATION_CONFIG,
     train_config as TRAIN_CONFIG,
 )
-from finetune_utils.data.concatenator import ConcatDataset
-from finetune_utils.policies import AnyPrecisionAdamW, apply_fsdp_checkpointing
+from data.concatenator import ConcatDataset
+from policies import AnyPrecisionAdamW, apply_fsdp_checkpointing
 
-from finetune_utils.utils import fsdp_auto_wrap_policy
-from finetune_utils.utils.config_utils import (
+from utils import fsdp_auto_wrap_policy
+from utils.config_utils import (
     check_fsdp_config,
     generate_dataset_config,
     generate_peft_config,
     get_dataloader_kwargs,
     update_config,
 )
-from finetune_utils.utils.dataset_utils import (
+from utils.dataset_utils import (
     get_custom_data_collator,
     get_preprocessed_dataset,
 )
 
-from finetune_utils.utils.fsdp_utils import hsdp_device_mesh
-from finetune_utils.utils.train_utils import (
+from utils.fsdp_utils import hsdp_device_mesh
+from utils.train_utils import (
     clear_gpu_cache,
     freeze_transformer_layers,
     freeze_LLM_only,
@@ -74,7 +74,7 @@ def setup_wandb(train_config, fsdp_config, **kwargs):
             "You are trying to use wandb which is not currently installed. "
             "Please install it using pip install wandb"
         )
-    from finetune_utils.configs import wandb_config as WANDB_CONFIG
+    from configs import wandb_config as WANDB_CONFIG
 
     wandb_config = WANDB_CONFIG()
     update_config(wandb_config, **kwargs)

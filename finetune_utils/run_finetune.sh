@@ -15,7 +15,7 @@ torchrun --nnodes 1 --nproc_per_node 4  main_file.py \
                                         --use_fast_kernels \
                                         --dataset "custom_dataset" \
                                         --custom_dataset.test_split "test" \
-                                        --custom_dataset.file "recipes/quickstart/finetuning/datasets/ocrvqa_dataset.py" \
+                                        --custom_dataset.file "datasets/ocrvqa_dataset.py" \
                                         --run_validation True \
                                         --batching_strategy padding \
                                         --use_peft \

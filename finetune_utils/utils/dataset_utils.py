@@ -3,9 +3,12 @@
 
 import torch
 
-from finetune_utils.data.concatenator import ConcatDataset
-from finetune_utils.datasets import DATASET_PREPROC, DATALOADER_COLLATE_FUNC
-from finetune_utils.utils.config_utils import get_dataloader_kwargs
+import sys
+sys.path.append("..")
+
+from data.concatenator import ConcatDataset
+from datasets import DATASET_PREPROC, DATALOADER_COLLATE_FUNC
+from utils.config_utils import get_dataloader_kwargs
 
 
 def get_preprocessed_dataset(

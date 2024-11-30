@@ -6,7 +6,9 @@
 import copy
 import datasets
 import itertools
-from finetune_utils.inference.prompt_format_utils import  LLAMA_GUARD_3_CATEGORY
+import sys
+sys.path.append("..")
+from inference.prompt_format_utils import  LLAMA_GUARD_3_CATEGORY
 import ast
 import fire
 
@@ -19,7 +21,7 @@ def tokenize_prompt_and_labels(full_prompt, tokenizer):
         return dict(combined_tokens, attention_mask=[1]*len(combined_tokens["input_ids"]))
     
 
-from finetune_utils.data.llama_guard.finetuning_data_formatter import TrainingExample, Guidelines, Category, LlamaGuardPromptConfigs, LlamaGuardGenerationConfigs, ExplanationPosition, AugmentationConfigs, FormatterConfigs, create_formatted_finetuning_examples
+from data.llama_guard.finetuning_data_formatter import TrainingExample, Guidelines, Category, LlamaGuardPromptConfigs, LlamaGuardGenerationConfigs, ExplanationPosition, AugmentationConfigs, FormatterConfigs, create_formatted_finetuning_examples
 from datasets import Dataset, DatasetInfo
 
 def mapTcCategoriesToLGCategories(TcCategoriesString):

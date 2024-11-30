@@ -15,9 +15,11 @@ from peft import (
 from transformers import default_data_collator
 from transformers.data import DataCollatorForSeq2Seq
 
-from finetune_utils.configs import datasets, lora_config, llama_adapter_config, prefix_config, train_config
-from finetune_utils.data.sampler import LengthBasedBatchSampler, DistributedLengthBasedBatchSampler
-from finetune_utils.datasets import DATASET_PREPROC
+import sys
+sys.path.append("..")
+from configs import datasets, lora_config, llama_adapter_config, prefix_config, train_config
+from data.sampler import LengthBasedBatchSampler, DistributedLengthBasedBatchSampler
+from datasets import DATASET_PREPROC
 
 def update_config(config, **kwargs):
     if isinstance(config, (tuple, list)):

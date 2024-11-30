@@ -9,7 +9,7 @@ import sys
 import fire
 import yaml
 
-from finetune_utils.inference.model_utils import load_llama_from_config
+from model_utils import load_llama_from_config
 
 from transformers import AutoConfig, AutoTokenizer, MllamaProcessor
 

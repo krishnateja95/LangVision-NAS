@@ -75,7 +75,6 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         world_size = int(os.environ["WORLD_SIZE"])
 
 
-
     autocast = torch.cuda.amp.autocast if train_config.use_fp16 else nullcontext
     train_prep = []
     train_loss = []
@@ -179,7 +178,7 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
 
         epoch_end_time = time.perf_counter()-epoch_start_time
         epoch_times.append(epoch_end_time)
-        # Reducing total_loss across all devices if there's more than one CUDA device
+        
         if is_xpu_available() and (torch.xpu.device_count() > 1 and train_config.enable_fsdp):
             dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
         elif torch.cuda.device_count() > 1 and train_config.enable_fsdp:

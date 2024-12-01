@@ -58,6 +58,7 @@ def get_custom_dataset(dataset_config, processor, split, split_ratio=0.9):
     dataset = dataset.train_test_split(test_size=1-split_ratio, shuffle=True, seed=42)[split]
     return dataset
 
+
 class OCRVQADataCollator:
     def __init__(self, processor):
         self.processor = processor

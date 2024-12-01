@@ -8,7 +8,7 @@ export HF_HOME="/lus/grand/projects/datascience/krishnat/model_weights/LLaMA/lla
 
 cd ../ 
 
-torchrun --nnodes 1 --nproc_per_node 4  main_file.py \
+torchrun --nnodes 1 --nproc_per_node 4  main_eval_file.py \
                                         --enable_fsdp \
                                         --lr 1e-5 \
                                         --num_epochs 3 \
@@ -22,7 +22,5 @@ torchrun --nnodes 1 --nproc_per_node 4  main_file.py \
                                         --custom_dataset.file "custom_data/ocrvqa_dataset.py" \
                                         --run_validation True \
                                         --batching_strategy padding \
-                                        --use_peft \
-                                        --peft_method lora \
                                         --output_dir "/lus/grand/projects/datascience/krishnat/model_weights/LLaMA/llama_cache/output_dir" \
                                         --profiler_dir "/lus/grand/projects/datascience/krishnat/model_weights/LLaMA/llama_cache/profile_dir" \

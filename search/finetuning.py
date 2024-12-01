@@ -56,7 +56,7 @@ from transformers import (
     AutoTokenizer,
     BitsAndBytesConfig,
     LlamaForCausalLM,
-    # MllamaForConditionalGeneration,
+    MllamaForConditionalGeneration,
 )
 
 

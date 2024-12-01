@@ -2,10 +2,12 @@
 
 ## LLaMA-3.2-11B
 
-| Vision Encoder<br>Attention Layer |       #Heads: []      |
-|   Vision Encoder FFN/ML Layer  | Intermediate Size: [] |
-|       LLM Attention Layer      |       #Heads: []      |
-|       LLM MLP/FFN Layer       | Intermediate Size: [] |
+| Vision Encoder<br>Attention Layer |       Search Elements      | Search Space | 
+|:---------------------------------:|:-----------------------:|:-----------------------:|
+| Vision Encoder Attention Layer |       Number of Heads | [] |      
+|   Vision Encoder FFN/ML Layer  | Intermediate Size | [] |
+|       LLM Attention Layer      |       Number of Heads | []      |
+|       LLM MLP/FFN Layer       | Intermediate Size | [] |
 
 ## Phi3V
 

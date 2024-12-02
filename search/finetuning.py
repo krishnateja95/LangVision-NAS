@@ -46,7 +46,7 @@ from utils.train_utils import (
     setup_environ_flags,
     train,
 )
-from peft import get_peft_model, PeftModel
+from peft import PeftModel
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
 from torch.distributed.fsdp.fully_sharded_data_parallel import CPUOffload
 from torch.optim.lr_scheduler import StepLR
@@ -131,9 +131,7 @@ def main(**kwargs):
             train_config.quantization = "8bit"
 
         if train_config.quantization == "8bit" and train_config.enable_fsdp:
-            raise ValueError(
-                "8bit quantization is not supported with FSDP, please use 4bit quantization"
-            )
+            raise ValueError("8bit quantization is not supported with FSDP, please use 4bit quantization")
 
         quant_config = QUANTIZATION_CONFIG()
         update_config(quant_config, **kwargs)
@@ -209,13 +207,13 @@ def main(**kwargs):
 
     if train_config.use_peft:
         if train_config.from_peft_checkpoint:
-            model = PeftModel.from_pretrained(
-                model, train_config.from_peft_checkpoint, is_trainable=True
-            )
+            model = PeftModel.from_pretrained(model, train_config.from_peft_checkpoint, is_trainable=True)
             peft_config = model.peft_config
         else:
+            from peft_utils import get_peft_model
             peft_config = generate_peft_config(train_config, kwargs)
             model = get_peft_model(model, peft_config)
+
         if wandb_run:
             wandb_run.config.update(peft_config)
         model.print_trainable_parameters()

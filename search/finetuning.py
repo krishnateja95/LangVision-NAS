@@ -214,7 +214,7 @@ def main(**kwargs):
             peft_config = generate_peft_config(train_config, kwargs)
             model = get_peft_model(model, peft_config)
             # model.merge_and_unload()
-            exit()
+            # exit()
         if wandb_run:
             wandb_run.config.update(peft_config)
         model.print_trainable_parameters()

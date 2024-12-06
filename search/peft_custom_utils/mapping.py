@@ -1,75 +1,12 @@
-# Copyright 2023-present the HuggingFace Inc. team.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 from __future__ import annotations
 
 import warnings
 from typing import TYPE_CHECKING, Any, Optional
 
 import torch
-
-from peft.tuners.xlora.model import XLoraModel
-
 from .config import PeftConfig
-# from .mixed_model import PeftMixedModel
-from .peft_model import (
-    PeftModel,
-    PeftModelForCausalLM,
-    # PeftModelForFeatureExtraction,
-    # PeftModelForQuestionAnswering,
-    # PeftModelForSeq2SeqLM,
-    # PeftModelForSequenceClassification,
-    # PeftModelForTokenClassification,
-)
-from .tuners import (
-    # AdaLoraConfig,
-    # AdaLoraModel,
-    # AdaptionPromptConfig,
-    # BOFTConfig,
-    # BOFTModel,
-    # BoneConfig,
-    # BoneModel,
-    # CPTConfig,
-    # CPTEmbedding,
-    # FourierFTConfig,
-    # FourierFTModel,
-    # HRAConfig,
-    # HRAModel,
-    # IA3Config,
-    # IA3Model,
-    # LNTuningConfig,
-    # LNTuningModel,
-    # LoHaConfig,
-    # LoHaModel,
-    # LoKrConfig,
-    # LoKrModel,
-    LoraConfig,
-    LoraModel,
-    # MultitaskPromptTuningConfig,
-    # OFTConfig,
-    # OFTModel,
-    # PolyConfig,
-    # PolyModel,
-    # PrefixTuningConfig,
-    # PromptEncoderConfig,
-    # PromptTuningConfig,
-    # VBLoRAConfig,
-    # VBLoRAModel,
-    # VeraConfig,
-    # VeraModel,
-    # XLoraConfig,
-)
+from .peft_model import (PeftModel, PeftModelForCausalLM)
+from .tuners import (LoraConfig, LoraModel)
 from .tuners.tuners_utils import BaseTuner
 from .utils import _prepare_prompt_learning_config
 
@@ -78,68 +15,11 @@ if TYPE_CHECKING:
     from transformers import PreTrainedModel
 
 
-MODEL_TYPE_TO_PEFT_MODEL_MAPPING: dict[str, type[PeftModel]] = {
-    "SEQ_CLS": PeftModelForSequenceClassification,
-    "SEQ_2_SEQ_LM": PeftModelForSeq2SeqLM,
-    "CAUSAL_LM": PeftModelForCausalLM,
-    "TOKEN_CLS": PeftModelForTokenClassification,
-    "QUESTION_ANS": PeftModelForQuestionAnswering,
-    "FEATURE_EXTRACTION": PeftModelForFeatureExtraction,
-}
-
-PEFT_TYPE_TO_CONFIG_MAPPING: dict[str, type[PeftConfig]] = {
-    # "ADAPTION_PROMPT": AdaptionPromptConfig,
-    # "PROMPT_TUNING": PromptTuningConfig,
-    # "PREFIX_TUNING": PrefixTuningConfig,
-    # "P_TUNING": PromptEncoderConfig,
-    "LORA": LoraConfig,
-    # "LOHA": LoHaConfig,
-    # "LORAPLUS": LoraConfig,
-    # "LOKR": LoKrConfig,
-    # "ADALORA": AdaLoraConfig,
-    # "BOFT": BOFTConfig,
-    # "IA3": IA3Config,
-    # "MULTITASK_PROMPT_TUNING": MultitaskPromptTuningConfig,
-    # "OFT": OFTConfig,
-    # "POLY": PolyConfig,
-    # "LN_TUNING": LNTuningConfig,
-    # "VERA": VeraConfig,
-    # "FOURIERFT": FourierFTConfig,
-    # "XLORA": XLoraConfig,
-    # "HRA": HRAConfig,
-    # "VBLORA": VBLoRAConfig,
-    # "CPT": CPTConfig,
-    # "BONE": BoneConfig,
-}
-
-PEFT_TYPE_TO_TUNER_MAPPING: dict[str, type[BaseTuner]] = {
-    "LORA": LoraModel,
-    # "LOHA": LoHaModel,
-    # "LOKR": LoKrModel,
-    # "ADALORA": AdaLoraModel,
-    # "BOFT": BOFTModel,
-    # "IA3": IA3Model,
-    # "OFT": OFTModel,
-    # "POLY": PolyModel,
-    # "LN_TUNING": LNTuningModel,
-    # "VERA": VeraModel,
-    # "FOURIERFT": FourierFTModel,
-    # "XLORA": XLoraModel,
-    # "HRA": HRAModel,
-    # "VBLORA": VBLoRAModel,
-    # "CPT": CPTEmbedding,
-    # "BONE": BoneModel,
-}
-
+MODEL_TYPE_TO_PEFT_MODEL_MAPPING: dict[str, type[PeftModel]] = {"CAUSAL_LM": PeftModelForCausalLM}
+PEFT_TYPE_TO_CONFIG_MAPPING: dict[str, type[PeftConfig]] = {"LORA": LoraConfig}
+PEFT_TYPE_TO_TUNER_MAPPING: dict[str, type[BaseTuner]] = {"LORA": LoraModel}
 
 def get_peft_config(config_dict: dict[str, Any]) -> PeftConfig:
-    """
-    Returns a Peft config object from a dictionary.
-
-    Args:
-        config_dict (`Dict[str, Any]`): Dictionary containing the configuration parameters.
-    """
-
     return PEFT_TYPE_TO_CONFIG_MAPPING[config_dict["peft_type"]](**config_dict)
 
 
@@ -151,7 +31,7 @@ def get_peft_model(
     autocast_adapter_dtype: bool = True,
     revision: Optional[str] = None,
     low_cpu_mem_usage: bool = False,
-) -> PeftModel | PeftMixedModel:
+):
     """
     Returns a Peft model object from a model and a config.
 

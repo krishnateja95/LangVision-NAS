@@ -15,7 +15,7 @@ for rank in 8; do
                                                 --lr 1e-5 \
                                                 --num_epochs 3 \
                                                 --batch_size_training 16 \
-                                                --model_name meta-llama/Llama-3.2-1B \
+                                                --model_name meta-llama/Llama-3.2-11B-Vision-Instruct \
                                                 --dist_checkpoint_root_folder "/lus/grand/projects/datascience/krishnat/model_weights/LLaMA/llama_cache/finetune_folder" \
                                                 --dist_checkpoint_folder "/lus/grand/projects/datascience/krishnat/model_weights/LLaMA/llama_cache/finetuned_folder" \
                                                 --use_fast_kernels \

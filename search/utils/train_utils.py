@@ -5,6 +5,7 @@ import yaml
 from contextlib import nullcontext
 from pathlib import Path
 from datetime import datetime
+import math 
 import contextlib
 
 
@@ -96,7 +97,8 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
     best_val_loss = float("inf")
     total_train_steps = 0
     max_steps_reached = False
-    
+    best_eval = float("inf")
+
     for epoch in range(train_config.num_epochs):
         print(f"Starting epoch {epoch}/{train_config.num_epochs}")
         print(f"train_config.max_train_step: {train_config.max_train_step}")
@@ -194,16 +196,18 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         if not train_config.enable_fsdp or rank==0:
             memtrace.print_stats()
 
-        # Update the learning rate as needed
         lr_scheduler.step()
         should_save_model = train_config.save_model
         if train_config.run_validation:
             eval_ppl, eval_epoch_loss, temp_val_loss, temp_step_perplexity = evaluation(model, train_config, eval_dataloader, local_rank, tokenizer, wandb_run)
+            print("model after eval", model)
+            exit()
             if train_config.save_metrics:
                 val_step_loss.extend(temp_val_loss)
                 val_step_perplexity.extend(temp_step_perplexity)
             should_save_model = train_config.save_model and eval_epoch_loss < best_val_loss
-        
+            best_eval = min(best_eval, eval_ppl)
+
         checkpoint_start_time = time.perf_counter()
         if should_save_model:
             if train_config.enable_fsdp:
@@ -291,6 +295,7 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         results['avg_eval_loss'] = avg_eval_loss
     results["avg_epoch_time"] = avg_epoch_time
     results["avg_checkpoint_time"] = avg_checkpoint_time
+    results["num_checkpoint_times"] = len(checkpoint_times)
     if train_config.save_metrics:
         results["metrics_filename"] = metrics_filename
     if train_config.flop_counter:
@@ -298,7 +303,8 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
     
     if train_config.enable_fsdp and not train_config.use_peft and rank==0:
         save_train_params(train_config, fsdp_config, rank)
-
+    results["best_eval"] = best_eval
+    
     return results
 
 def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb_run):
@@ -355,9 +361,9 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb
     # Print evaluation metrics
     if train_config.enable_fsdp:
         if local_rank==0:
-            print(f" {eval_ppl=} {eval_epoch_loss=}")
+            print(f" {eval_ppl} {eval_epoch_loss}")
     else:
-        print(f" {eval_ppl=} {eval_epoch_loss=}")
+        print(f" {eval_ppl} {eval_epoch_loss}")
 
     if wandb_run:
         wandb_run.log({

@@ -61,9 +61,28 @@ def generate_peft_config(train_config, kwargs):
     update_config(config, **kwargs)
     params = asdict(config)
     peft_config = peft_configs[names.index(train_config.peft_method)](**params)
+    
+    peft_config.r = train_config.lora_rank
+    
+    adapter_dict = {"q": "q_proj",
+                    "k": "k_proj",
+                    "v": "v_proj",
+                    "o": "o_proj",
+                    "g": "gate_proj",
+                    "u": "up_proj",
+                    "d": "down_proj",
+                    "f": "fc1",
+                    "c": "fc2"
+                    }
+    
+    target_adapter_modules = []
+    for key in adapter_dict:
+        if key in train_config.lora_adapters:
+            target_adapter_modules.append(adapter_dict[key]) 
+
+    peft_config.target_modules = target_adapter_modules
 
     return peft_config
-
 
 def generate_dataset_config(train_config, kwargs):
     names = tuple(DATASET_PREPROC.keys())

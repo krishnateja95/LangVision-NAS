@@ -6,7 +6,7 @@ import os
 import random
 from collections import Counter
 from warnings import warn
-
+import time
 import fire
 import numpy as np
 import torch
@@ -58,7 +58,6 @@ from transformers import (
     LlamaForCausalLM,
     MllamaForConditionalGeneration,
 )
-
 
 
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
@@ -209,14 +208,18 @@ def main(**kwargs):
         if train_config.from_peft_checkpoint:
             model = PeftModel.from_pretrained(model, train_config.from_peft_checkpoint, is_trainable=True)
             peft_config = model.peft_config
+            
         else:
-            from peft_utils import get_peft_model
+            from peft_custom_utils import get_peft_model
             peft_config = generate_peft_config(train_config, kwargs)
             model = get_peft_model(model, peft_config)
-
+            # model.merge_and_unload()
+            exit()
         if wandb_run:
             wandb_run.config.update(peft_config)
         model.print_trainable_parameters()
+        trainable_params, all_param = model.get_nb_trainable_parameters()
+
 
     hsdp_device_mesh_plan = None
     if (
@@ -372,7 +375,7 @@ def main(**kwargs):
         print(f"--> Num of Validation Set Batches loaded = {len(eval_dataloader)}")
         if len(eval_dataloader) == 0:
             raise ValueError(
-                f"The eval set size is too small for dataloader to load even one batch. Please increase the size of eval set. ({len(eval_dataloader)=})"
+                f"The eval set size is too small for dataloader to load even one batch. Please increase the size of eval set. ({len(eval_dataloader)})"
             )
         else:
             print(f"--> Num of Validation Set Batches loaded = {len(eval_dataloader)}")
@@ -407,12 +410,44 @@ def main(**kwargs):
         rank if train_config.enable_fsdp else None,
         wandb_run,
     )
+
+    results["trainable_params"] = trainable_params
+    results["all_param"] = all_param
+
     if not train_config.enable_fsdp or rank == 0:
         [print(f"Key: {k}, Value: {v}") for k, v in results.items()]
         if train_config.use_wandb:
             for k, v in results.items():
                 wandb_run.summary[k] = v
 
+    return results, train_config, peft_config
+
 
 if __name__ == "__main__":
-    fire.Fire(main)
+
+    start_time = time.perf_counter()
+    results, train_config, peft_config = fire.Fire(main)
+    end_time = time.perf_counter()
+
+    total_time = start_time - end_time 
+
+    print(results)
+    
+    import csv
+    list_1 = ["Hardware", "Num of Hardware", "Model", "Trainable", "All params", "Dataset", "target_modules", "LoRA Rank", "Avg Epoch Time", "Eval PPL"]
+    list_2 = ["Nvidia A100 GPU", 4, train_config.model_name, results["trainable_params"], results["all_param"], "ocrvqa", peft_config.target_modules, peft_config.r, results["avg_epoch_time"], results["best_eval"]] 
+    assert len(list_1) == len(list_2)
+
+    csv_file = "LoRA_Bench.csv"
+    file_exists = os.path.exists(csv_file)
+
+    with open(csv_file, 'a', newline = '') as csvfile:
+        writer = csv.writer(csvfile)
+        
+        if not file_exists:
+            writer.writerow(list_1)
+        
+        writer.writerow(list_2) 
+        
+    csvfile.close()
+

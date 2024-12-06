@@ -49,3 +49,5 @@ class train_config:
     flop_counter_start: int = 3 # The step to start profiling, default is 3, which means after 3 steps of warmup stage, the profiler will start to count flops.
     use_profiler: bool = False # Enable pytorch profiler, can not be used with flop counter at the same time.
     profiler_dir: str = "PATH/to/save/profiler/results" # will be used if using profiler
+    lora_rank: int = 8 # LoRA Rank
+    lora_adapters: str = 'qkv' # LoRA Adapters

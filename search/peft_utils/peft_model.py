@@ -1677,9 +1677,7 @@ class PeftModelForCausalLM(PeftModel):
         ```
     """
 
-    def __init__(
-        self, model: torch.nn.Module, peft_config: PeftConfig, adapter_name: str = "default", **kwargs
-    ) -> None:
+    def __init__(self, model: torch.nn.Module, peft_config: PeftConfig, adapter_name: str = "default", **kwargs) -> None:
         super().__init__(model, peft_config, adapter_name, **kwargs)
         self.base_model_prepare_inputs_for_generation = self.base_model.prepare_inputs_for_generation
 

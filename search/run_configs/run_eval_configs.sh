@@ -10,10 +10,10 @@ cd ../
 
 for rank in 8; do
     for lora_adapters in "qkvgud"; do 
-        torchrun --nnodes 1 --nproc_per_node 4  main_file.py \
+        torchrun --nnodes 1 --nproc_per_node 4 main_file.py \
                                                 --enable_fsdp \
                                                 --lr 1e-5 \
-                                                --num_epochs 3 \
+                                                --num_epochs 1 \
                                                 --batch_size_training 16 \
                                                 --model_name meta-llama/Llama-3.2-11B-Vision-Instruct \
                                                 --dist_checkpoint_root_folder "/lus/grand/projects/datascience/krishnat/model_weights/LLaMA/llama_cache/finetune_folder" \

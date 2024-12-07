@@ -51,19 +51,6 @@ logger = logging.getLogger(__name__)
 
 @contextmanager
 def onload_layer(layer):
-    r"""
-    A utility for modifying a module containing one or more tuners and a base layer, any of which are offloaded to the
-    CPU or disk. Moves a module's sub-modules to the execution device before some action is performed, after that the
-    base layer state dictionary is re-assigned (if that layer was offloaded to the disk) and finally the parameters are
-    offloaded.
-
-    If the module has no offloaded sub-modules, this function does nothing.
-
-    Args:
-        layer ('torch.nn.Module'):
-            layer with tuners to be merged
-    """
-
     offloaded_modules = []
     for name, module in layer.named_modules():
         if name in ["", "base_layer"]:
@@ -394,7 +381,7 @@ class BaseTuner(nn.Module, ABC):
         tied_target_modules = self._get_tied_target_modules(self.model)
         if tied_target_modules:
             warnings.warn(
-                f"Model with `tie_word_embeddings=True` and the {tied_target_modules=} are part of the adapter. "
+                f"Model with `tie_word_embeddings=True` and the {tied_target_modules} are part of the adapter. "
                 "This can lead to complications. "
                 "You can opt to merge the adapter after cloning the weights (to untie the embeddings). "
                 "You can untie the embeddings by loading the model with `tie_word_embeddings=False`. For example:"
@@ -541,7 +528,7 @@ class BaseTuner(nn.Module, ABC):
         tied_target_modules = self._get_tied_target_modules(model=model)
         if tied_target_modules:
             warnings.warn(
-                f"Model with `tie_word_embeddings=True` and the {tied_target_modules=} are part of the adapter. "
+                f"Model with `tie_word_embeddings=True` and the {tied_target_modules} are part of the adapter. "
                 "This can lead to complications, for example when merging the adapter "
                 "or converting your model to formats other than safetensors. "
                 "See for example https://github.com/huggingface/peft/issues/2018."

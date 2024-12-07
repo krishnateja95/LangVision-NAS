@@ -14,3 +14,17 @@ Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,17694720,10687915555,
 Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,17694720,10687915555,ocrvqa,"['gate_proj', 'up_proj', 'down_proj']",8,193.4739127153298,"tensor(1.2426, device='cuda:1')"
 Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,17694720,10687915555,ocrvqa,"['gate_proj', 'up_proj', 'down_proj']",8,193.46747980600534,"tensor(1.2426, device='cuda:2')"
 Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,17694720,10687915555,ocrvqa,"['gate_proj', 'up_proj', 'down_proj']",8,193.4717744193525,"tensor(1.2426, device='cuda:3')"
+
+Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,266.5392755930079,1.407752275466919
+Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,266.5417907470255,1.407752275466919
+Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,266.5244503170252,1.407752275466919
+Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,266.537976159947,1.407752275466919
+
+
+Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,252.7026216390077,1.4081063270568848
+Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,252.3991196770221,1.4081063270568848
+Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,252.72488274495117,1.4081063270568848
+Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,251.82500315603102,1.4081063270568848
+
+
+Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,252.27990793599747,1.4079550504684448

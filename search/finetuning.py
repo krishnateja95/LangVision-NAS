@@ -213,8 +213,8 @@ def main(**kwargs):
             from peft_custom_utils import get_peft_model
             peft_config = generate_peft_config(train_config, kwargs)
             model = get_peft_model(model, peft_config)
+            print("Created Lora model")
             # model.merge_and_unload()
-            # exit()
         if wandb_run:
             wandb_run.config.update(peft_config)
         model.print_trainable_parameters()
@@ -429,25 +429,26 @@ if __name__ == "__main__":
     results, train_config, peft_config = fire.Fire(main)
     end_time = time.perf_counter()
 
-    total_time = start_time - end_time 
-
-    print(results)
-    
-    import csv
-    list_1 = ["Hardware", "Num of Hardware", "Model", "Trainable", "All params", "Dataset", "target_modules", "LoRA Rank", "Avg Epoch Time", "Eval PPL"]
-    list_2 = ["Nvidia A100 GPU", 4, train_config.model_name, results["trainable_params"], results["all_param"], "ocrvqa", peft_config.target_modules, peft_config.r, results["avg_epoch_time"], results["best_eval"]] 
-    assert len(list_1) == len(list_2)
-
-    csv_file = "LoRA_Bench.csv"
-    file_exists = os.path.exists(csv_file)
-
-    with open(csv_file, 'a', newline = '') as csvfile:
-        writer = csv.writer(csvfile)
+    total_time = start_time - end_time
+    rank = int(os.environ["RANK"]) 
+    if rank == 0:
+        print(results)
         
-        if not file_exists:
-            writer.writerow(list_1)
-        
-        writer.writerow(list_2) 
-        
-    csvfile.close()
+        import csv
+        list_1 = ["Hardware", "Num of Hardware", "Model", "Trainable", "All params", "Dataset", "target_modules", "LoRA Rank", "Avg Epoch Time", "Eval PPL"]
+        list_2 = ["Nvidia A100 GPU", 4, train_config.model_name, results["trainable_params"], results["all_param"], "ocrvqa", peft_config.target_modules, peft_config.r, results["avg_epoch_time"], results["best_eval"]] 
+        assert len(list_1) == len(list_2)
+
+        csv_file = "LoRA_Bench.csv"
+        file_exists = os.path.exists(csv_file)
+
+        with open(csv_file, 'a', newline = '') as csvfile:
+            writer = csv.writer(csvfile)
+            
+            if not file_exists:
+                writer.writerow(list_1)
+            
+            writer.writerow(list_2) 
+            
+        csvfile.close()
 

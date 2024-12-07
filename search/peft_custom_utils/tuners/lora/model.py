@@ -19,7 +19,7 @@ from ...tuners.tuners_utils import (
     BaseTuner,
     BaseTunerLayer,
     check_target_module_exists,
-    onload_layer,
+    # onload_layer,
     replicate_layers,
 )
 
@@ -35,110 +35,29 @@ from ...utils import (
 from ...utils.merge_utils import dare_linear, dare_ties, magnitude_prune, task_arithmetic, ties
 from ...utils.other import get_pattern_key
 
-from .aqlm import dispatch_aqlm
-from .awq import dispatch_awq
+# from .aqlm import dispatch_aqlm
+# from .awq import dispatch_awq
 from .config import LoraConfig
-from .eetq import dispatch_eetq
-from .gptq import dispatch_gptq
-from .hqq import dispatch_hqq
-from .layer import Conv2d, LoraLayer, dispatch_default
+# from .eetq import dispatch_eetq
+# from .gptq import dispatch_gptq
+# from .hqq import dispatch_hqq
+from .layer import LoraLayer, dispatch_default
 from .torchao import dispatch_torchao
 from .tp_layer import dispatch_megatron
 
 
 def _adapter_names_pre_forward_hook(target, args, kwargs, adapter_names):
-    # pre-forward hook to inject the adapter_names argument when using mixed adapter batches inference
     kwargs["adapter_names"] = adapter_names
     return args, kwargs
 
 
 class LoraModel(BaseTuner):
-    """
-    Creates Low Rank Adapter (LoRA) model from a pretrained transformers model.
-
-    The method is described in detail in https://arxiv.org/abs/2106.09685.
-
-    Args:
-        model ([`torch.nn.Module`]): The model to be adapted.
-        config ([`LoraConfig`]): The configuration of the Lora model.
-        adapter_name (`str`): The name of the adapter, defaults to `"default"`.
-        low_cpu_mem_usage (`bool`, `optional`, defaults to `False`):
-            Create empty adapter weights on meta device. Useful to speed up the loading process.
-
-    Returns:
-        `torch.nn.Module`: The Lora model.
-
-    Example:
-
-        ```py
-        >>> from transformers import AutoModelForSeq2SeqLM
-        >>> from peft import LoraModel, LoraConfig
-
-        >>> config = LoraConfig(
-        ...     task_type="SEQ_2_SEQ_LM",
-        ...     r=8,
-        ...     lora_alpha=32,
-        ...     target_modules=["q", "v"],
-        ...     lora_dropout=0.01,
-        ... )
-
-        >>> model = AutoModelForSeq2SeqLM.from_pretrained("t5-base")
-        >>> lora_model = LoraModel(model, config, "default")
-        ```
-
-        ```py
-        >>> import torch
-        >>> import transformers
-        >>> from peft import LoraConfig, PeftModel, get_peft_model, prepare_model_for_kbit_training
-
-        >>> rank = ...
-        >>> target_modules = ["q_proj", "k_proj", "v_proj", "out_proj", "fc_in", "fc_out", "wte"]
-        >>> config = LoraConfig(
-        ...     r=4, lora_alpha=16, target_modules=target_modules, lora_dropout=0.1, bias="none", task_type="CAUSAL_LM"
-        ... )
-        >>> quantization_config = transformers.BitsAndBytesConfig(load_in_8bit=True)
-
-        >>> tokenizer = transformers.AutoTokenizer.from_pretrained(
-        ...     "kakaobrain/kogpt",
-        ...     revision="KoGPT6B-ryan1.5b-float16",  # or float32 version: revision=KoGPT6B-ryan1.5b
-        ...     bos_token="[BOS]",
-        ...     eos_token="[EOS]",
-        ...     unk_token="[UNK]",
-        ...     pad_token="[PAD]",
-        ...     mask_token="[MASK]",
-        ... )
-        >>> model = transformers.GPTJForCausalLM.from_pretrained(
-        ...     "kakaobrain/kogpt",
-        ...     revision="KoGPT6B-ryan1.5b-float16",  # or float32 version: revision=KoGPT6B-ryan1.5b
-        ...     pad_token_id=tokenizer.eos_token_id,
-        ...     use_cache=False,
-        ...     device_map={"": rank},
-        ...     torch_dtype=torch.float16,
-        ...     quantization_config=quantization_config,
-        ... )
-        >>> model = prepare_model_for_kbit_training(model)
-        >>> lora_model = get_peft_model(model, config)
-        ```
-
-    **Attributes**:
-        - **model** ([`~transformers.PreTrainedModel`]) -- The model to be adapted.
-        - **peft_config** ([`LoraConfig`]): The configuration of the Lora model.
-    """
-
     prefix: str = "lora_"
 
     def __init__(self, model, config, adapter_name, low_cpu_mem_usage: bool = False) -> None:
         super().__init__(model, config, adapter_name, low_cpu_mem_usage=low_cpu_mem_usage)
 
     def _check_new_adapter_config(self, config: LoraConfig) -> None:
-        """
-        A helper method to check the config when a new adapter is being added.
-
-        Raise a ValueError if there is something wrong with the config or if it conflicts with existing adapters.
-
-        """
-        # TODO: there should be a check if any of the existing adapters actually has bias != "none", or else the check
-        # does not fully correspond to the error message.
         if (len(self.peft_config) > 1) and (config.bias != "none"):
             raise ValueError(
                 f"{self.__class__.__name__} supports only 1 adapter with bias. When using multiple adapters, "
@@ -150,15 +69,6 @@ class LoraModel(BaseTuner):
         return check_target_module_exists(lora_config, key)
 
     def _prepare_model(self, peft_config: LoraConfig, model: nn.Module):
-        r"""
-        A private method to modify the model structure before adapter is applied.
-
-        Args:
-            peft_config (`PeftConfig`):
-                The prepared adapter config.
-            model (`nn.Module`):
-                The model that is going to be adapted.
-        """
         if peft_config.layer_replication:
             replicate_layers(model, peft_config.layer_replication)
 
@@ -208,10 +118,7 @@ class LoraModel(BaseTuner):
             if quantization_config is not None:
                 kwargs[f"{quant_method}_quantization_config"] = quantization_config
 
-        # note: AdaLoraLayer is a subclass of LoraLayer, we need to exclude it
-        from peft.tuners.adalora import AdaLoraLayer
-
-        if isinstance(target, LoraLayer) and not isinstance(target, AdaLoraLayer):
+        if isinstance(target, LoraLayer):
             target.update_layer(
                 adapter_name,
                 r,
@@ -316,24 +223,8 @@ class LoraModel(BaseTuner):
 
             dispatchers.append(dynamic_dispatch_func)
 
-        # avoid eager bnb import
-        if is_bnb_available():
-            from .bnb import dispatch_bnb_8bit
-
-            dispatchers.append(dispatch_bnb_8bit)
-
-        if is_bnb_4bit_available():
-            from .bnb import dispatch_bnb_4bit
-
-            dispatchers.append(dispatch_bnb_4bit)
-
         dispatchers.extend(
             [
-                dispatch_eetq,
-                dispatch_aqlm,
-                dispatch_awq,
-                dispatch_gptq,
-                dispatch_hqq,
                 dispatch_torchao,
                 dispatch_megatron,
                 dispatch_default,
@@ -597,46 +488,6 @@ class LoraModel(BaseTuner):
         density: float | None = None,
         majority_sign_method: Literal["total", "frequency"] = "total",
     ) -> None:
-        """
-        This method adds a new adapter by merging the given adapters with the given weights.
-
-        When using the `cat` combination_type you should be aware that rank of the resulting adapter will be equal to
-        the sum of all adapters ranks. So it's possible that the mixed adapter may become too big and result in OOM
-        errors.
-
-        Args:
-            adapters (`list`):
-                List of adapter names to be merged.
-            weights (`list`):
-                List of weights for each adapter.
-            adapter_name (`str`):
-                Name of the new adapter.
-            combination_type (`str`):
-                The merging type can be one of [`svd`, `linear`, `cat`, `ties`, `ties_svd`, `dare_ties`, `dare_linear`,
-                `dare_ties_svd`, `dare_linear_svd`, `magnitude_prune`, `magnitude_prune_svd`]. When using the `cat`
-                combination_type, the rank of the resulting adapter is equal to the sum of all adapters ranks (the
-                mixed adapter may be too big and result in OOM errors).
-            svd_rank (`int`, *optional*):
-                Rank of output adapter for svd. If None provided, will use max rank of merging adapters.
-            svd_clamp (`float`, *optional*):
-                A quantile threshold for clamping SVD decomposition output. If None is provided, do not perform
-                clamping. Defaults to None.
-            svd_full_matrices (`bool`, *optional*):
-                Controls whether to compute the full or reduced SVD, and consequently, the shape of the returned
-                tensors U and Vh. Defaults to True.
-            svd_driver (`str`, *optional*):
-                Name of the cuSOLVER method to be used. This keyword argument only works when merging on CUDA. Can be
-                one of [None, `gesvd`, `gesvdj`, `gesvda`]. For more info please refer to `torch.linalg.svd`
-                documentation. Defaults to None.
-            density (`float`, *optional*):
-                Value between 0 and 1. 0 means all values are pruned and 1 means no values are pruned. Should be used
-                with [`ties`, `ties_svd`, `dare_ties`, `dare_linear`, `dare_ties_svd`, `dare_linear_svd`,
-                `magnintude_prune`, `magnitude_prune_svd`]
-            majority_sign_method (`str`):
-                The method, should be one of ["total", "frequency"], to use to get the magnitude of the sign values.
-                Should be used with [`ties`, `ties_svd`, `dare_ties`, `dare_ties_svd`]
-        """
-
         if adapter_name in list(self.peft_config.keys()):
             return
 
@@ -718,125 +569,7 @@ class LoraModel(BaseTuner):
                         combination_type, adapters, weights, target, density, majority_sign_method
                     )
 
-    def _svd_generalized_task_arithmetic_weighted_adapter(
-        self,
-        combination_type,
-        adapters,
-        weights,
-        new_rank,
-        target,
-        target_lora_A,
-        target_lora_B,
-        density,
-        majority_sign_method,
-        clamp=None,
-        full_matrices=True,
-        driver=None,
-    ):
-        valid_adapters = []
-        valid_weights = []
-        is_embedding = any(adapter in target.lora_embedding_A for adapter in adapters)
-        for adapter, weight in zip(adapters, weights):
-            if adapter in target.lora_A or adapter in target.lora_embedding_A:
-                valid_adapters.append(adapter)
-                valid_weights.append(weight * target.scaling[adapter])
-
-        # if no valid adapter, nothing to do
-        if len(valid_adapters) == 0:
-            raise ValueError("No matching LoRAs found. Please raise an issue on Github.")
-        delta_weight = [target.get_delta_weight(adapter) for adapter in valid_adapters]
-        valid_weights = torch.tensor(valid_weights).to(delta_weight[0].device)
-        if combination_type == "svd":
-            delta_weight = task_arithmetic(delta_weight, valid_weights)
-        elif combination_type == "ties_svd":
-            delta_weight = ties(delta_weight, valid_weights, density, majority_sign_method)
-        elif combination_type == "dare_linear_svd":
-            delta_weight = dare_linear(delta_weight, valid_weights, density)
-        elif combination_type == "dare_ties_svd":
-            delta_weight = dare_ties(delta_weight, valid_weights, density, majority_sign_method)
-        elif combination_type == "magnitude_prune_svd":
-            delta_weight = magnitude_prune(delta_weight, valid_weights, density)
-        else:
-            raise ValueError(f"Invalid value passed to combination type: {combination_type}")
-
-        conv2d = isinstance(target, Conv2d)
-        if conv2d:
-            conv2d_1x1 = target.weight.size()[2:4] == (1, 1)
-            if not conv2d_1x1:
-                delta_weight = delta_weight.flatten(start_dim=1)
-            else:
-                delta_weight = delta_weight.squeeze()
-        if (hasattr(target, "fan_in_fan_out") and target.fan_in_fan_out) or is_embedding:
-            delta_weight = delta_weight.T
-
-        # based on https://github.com/kohya-ss/sd-scripts/blob/main/networks/svd_merge_lora.py#L114-L131
-        U, S, Vh = torch.linalg.svd(delta_weight, full_matrices=full_matrices, driver=driver)
-        U = U[:, :new_rank]
-        S = S[:new_rank]
-        U = U @ torch.diag(S)
-        Vh = Vh[:new_rank, :]
-        if clamp is not None:
-            dist = torch.cat([U.flatten(), Vh.flatten()])
-            hi_val = torch.quantile(dist, clamp)
-            low_val = -hi_val
-            U = U.clamp(low_val, hi_val)
-            Vh = Vh.clamp(low_val, hi_val)
-        if conv2d:
-            U = U.reshape(target_lora_B.data.shape)
-            Vh = Vh.reshape(target_lora_A.data.shape)
-        return Vh, U
-
-    def _generalized_task_arithmetic_weighted_adapter(
-        self,
-        combination_type,
-        adapters,
-        weights,
-        target,
-        density,
-        majority_sign_method,
-    ):
-        # account weights for LoRA A and B layers.
-        valid_weights = []
-        lora_A_deltas = []
-        lora_B_deltas = []
-        for adapter, weight in zip(adapters, weights):
-            if adapter in target.lora_A:
-                current_adapter_lora_A = target.lora_A[adapter].weight
-                current_adapter_lora_B = target.lora_B[adapter].weight
-            elif adapter in target.lora_embedding_A:
-                current_adapter_lora_A = target.lora_embedding_A[adapter]
-                current_adapter_lora_B = target.lora_embedding_B[adapter]
-            else:
-                continue
-            valid_weights.append(math.sqrt(weight * target.scaling[adapter]))
-            lora_A_deltas.append(current_adapter_lora_A.data)
-            lora_B_deltas.append(current_adapter_lora_B.data)
-        valid_weights = torch.tensor(valid_weights).to(lora_A_deltas[0].device)
-        lora_deltas = [lora_A_deltas, lora_B_deltas]
-        dtype = lora_A_deltas[0].dtype
-        for i, task_tensors in enumerate(lora_deltas):
-            if combination_type == "linear":
-                lora_deltas[i] = task_arithmetic(task_tensors, valid_weights)
-            elif combination_type == "ties":
-                lora_deltas[i] = ties(task_tensors, valid_weights, density, majority_sign_method)
-            elif combination_type == "dare_linear":
-                lora_deltas[i] = dare_linear(task_tensors, valid_weights, density)
-            elif combination_type == "dare_ties":
-                lora_deltas[i] = dare_ties(task_tensors, valid_weights, density, majority_sign_method)
-            elif combination_type == "magnitude_prune":
-                lora_deltas[i] = magnitude_prune(task_tensors, valid_weights, density)
-            else:
-                raise ValueError("Invalid combination type")
-        lora_deltas = [delta.to(dtype) for delta in lora_deltas]
-        return lora_deltas
-
     def delete_adapter(self, adapter_name: str) -> None:
-        """
-        Deletes an existing adapter.
-
-        Args:
-            adapter_name (str): Name of the adapter to be deleted.
-        """
         if adapter_name not in list(self.peft_config.keys()):
             raise ValueError(f"Adapter {adapter_name} does not exist")
         del self.peft_config[adapter_name]
@@ -852,51 +585,13 @@ class LoraModel(BaseTuner):
 
         self.active_adapter = new_adapter or []
 
-    def merge_and_unload(
-        self, progressbar: bool = False, safe_merge: bool = False, adapter_names: Optional[list[str]] = None
-    ) -> torch.nn.Module:
-        r"""
-        This method merges the LoRa layers into the base model. This is needed if someone wants to use the base model
-        as a standalone model.
-
-        Args:
-            progressbar (`bool`):
-                whether to show a progressbar indicating the unload and merge process
-            safe_merge (`bool`):
-                whether to activate the safe merging check to check if there is any potential Nan in the adapter
-                weights
-            adapter_names (`List[str]`, *optional*):
-                The list of adapter names that should be merged. If None, all active adapters will be merged. Defaults
-                to `None`.
-        Example:
-
-        ```py
-        >>> from transformers import AutoModelForCausalLM
-        >>> from peft import PeftModel
-
-        >>> base_model = AutoModelForCausalLM.from_pretrained("tiiuae/falcon-40b")
-        >>> peft_model_id = "smangrul/falcon-40B-int4-peft-lora-sfttrainer-sample"
-        >>> model = PeftModel.from_pretrained(base_model, peft_model_id)
-        >>> merged_model = model.merge_and_unload()
-        ```
-        """
-        return self._unload_and_optionally_merge(
-            progressbar=progressbar, safe_merge=safe_merge, adapter_names=adapter_names
-        )
+    def merge_and_unload(self, progressbar: bool = False, safe_merge: bool = False, adapter_names: Optional[list[str]] = None):
+        return self._unload_and_optionally_merge(progressbar=progressbar, safe_merge=safe_merge, adapter_names=adapter_names)
 
     def unload(self) -> torch.nn.Module:
-        """
-        Gets back the base model by removing all the lora modules without merging. This gives back the original base
-        model.
-        """
         return self._unload_and_optionally_merge(merge=False)
 
     def subtract_mutated_init(self, output_state_dict: dict[str, torch.Tensor], adapter_name: str, kwargs=None):
-        """
-        This function can calculate the updates of the [PiSSA | OLoRA] by comparing the parameters of the [PiSSA |
-        OLoRA] adapter in `output_state_dict` with the initial values of [PiSSA | OLoRA] in `adapter_name`, thus
-        converting [PiSSA | OLoRA] to LoRA.
-        """
         for name, param in self.model.named_parameters():
             if (
                 param.data.dtype != torch.float32

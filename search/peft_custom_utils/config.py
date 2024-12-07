@@ -1,16 +1,4 @@
-# Copyright 2023-present the HuggingFace Inc. team.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+
 import inspect
 import json
 import os
@@ -24,18 +12,10 @@ from transformers.utils import PushToHubMixin
 from .utils import CONFIG_NAME, PeftType, TaskType
 
 
-# we expect at least these keys to be present in a PEFT adapter_config.json
 MIN_EXPECTED_CONFIG_KEYS = {"peft_type"}
 
 
 def _check_and_remove_unused_kwargs(cls, kwargs):
-    """Make PEFT configs forward-compatible by removing unused kwargs that were added in later PEFT versions.
-
-    This assumes that removing the unused kwargs will not affect the default behavior.
-
-    Returns the filtered kwargs and the set of removed keys.
-    """
-    # it's not pretty but eh
     signature_parameters = inspect.signature(cls.__init__).parameters
     unexpected_kwargs = set(kwargs.keys()) - set(signature_parameters.keys())
     for key in unexpected_kwargs:
@@ -45,16 +25,6 @@ def _check_and_remove_unused_kwargs(cls, kwargs):
 
 @dataclass
 class PeftConfigMixin(PushToHubMixin):
-    r"""
-    This is the base configuration class for PEFT adapter models. It contains all the methods that are common to all
-    PEFT adapter models. This class inherits from [`~transformers.utils.PushToHubMixin`] which contains the methods to
-    push your model to the Hub. The method `save_pretrained` will save the configuration of your adapter model in a
-    directory. The method `from_pretrained` will load the configuration of your adapter model from a directory.
-
-    Args:
-        peft_type (Union[[`~peft.utils.config.PeftType`], `str`]): The type of Peft method to use.
-    """
-
     task_type: Optional[TaskType] = field(default=None, metadata={"help": "The type of task."})
     peft_type: Optional[PeftType] = field(default=None, metadata={"help": "The type of PEFT model."})
     auto_mapping: Optional[dict] = field(
@@ -109,33 +79,7 @@ class PeftConfigMixin(PushToHubMixin):
 
     @classmethod
     def from_peft_type(cls, **kwargs):
-        r"""
-        This method loads the configuration of your adapter model from a set of kwargs.
-
-        The appropriate configuration type is determined by the `peft_type` argument. If `peft_type` is not provided,
-        the calling class type is instantiated.
-
-        Args:
-            kwargs (configuration keyword arguments):
-                Keyword arguments passed along to the configuration initialization.
-        """
-        # Avoid circular dependency .. TODO: fix this with a larger refactor
         from peft.mapping import PEFT_TYPE_TO_CONFIG_MAPPING
-
-        # TODO: this hack is needed to fix the following issue (on commit 702f937):
-        # if someone saves a default config and loads it back with `PeftConfig` class it yields to
-        # not loading the correct config class.
-        #
-        # from peft import AdaLoraConfig, PeftConfig
-        # peft_config = AdaLoraConfig()
-        # print(peft_config)
-        # >>> AdaLoraConfig(peft_type=<PeftType.ADALORA: 'ADALORA'>, auto_mapping=None, base_model_name_or_path=None,
-        # revision=None, task_type=None, inference_mode=False, r=8, target_modules=None, lora_alpha=8, lora_dropout=0.0, ...
-        #
-        # peft_config.save_pretrained("./test_config")
-        # peft_config = PeftConfig.from_pretrained("./test_config")
-        # print(peft_config)
-        # >>> PeftConfig(peft_type='ADALORA', auto_mapping=None, base_model_name_or_path=None, revision=None, task_type=None, inference_mode=False)
 
         if "peft_type" in kwargs:
             peft_type = kwargs["peft_type"]
@@ -146,12 +90,6 @@ class PeftConfigMixin(PushToHubMixin):
         try:
             config = config_cls(**kwargs)
         except TypeError as exc:
-            # Here we potentially handle forward compatibility. Sometimes new keywords are added to configs, which makes
-            # new configs incompatible with older PEFT versions. We catch these and remove them to allow the program to
-            # continue, but warn the user about it.
-
-            # First check if the error is due to unexpected keyword arguments, we don't want to accidentally catch
-            # other TypeErrors.
             if "got an unexpected keyword argument" not in str(exc):
                 raise exc
 
@@ -307,33 +245,33 @@ class PeftConfig(PeftConfigMixin):
     inference_mode: bool = field(default=False, metadata={"help": "Whether to use inference mode"})
 
 
-@dataclass
-class PromptLearningConfig(PeftConfig):
-    """
-    This is the base configuration class to store the configuration of [`PrefixTuning`], [`PromptEncoder`], or
-    [`PromptTuning`].
+# @dataclass
+# class PromptLearningConfig(PeftConfig):
+#     """
+#     This is the base configuration class to store the configuration of [`PrefixTuning`], [`PromptEncoder`], or
+#     [`PromptTuning`].
 
-    Args:
-        num_virtual_tokens (`int`): The number of virtual tokens to use.
-        token_dim (`int`): The hidden embedding dimension of the base transformer model.
-        num_transformer_submodules (`int`): The number of transformer submodules in the base transformer model.
-        num_attention_heads (`int`): The number of attention heads in the base transformer model.
-        num_layers (`int`): The number of layers in the base transformer model.
-    """
+#     Args:
+#         num_virtual_tokens (`int`): The number of virtual tokens to use.
+#         token_dim (`int`): The hidden embedding dimension of the base transformer model.
+#         num_transformer_submodules (`int`): The number of transformer submodules in the base transformer model.
+#         num_attention_heads (`int`): The number of attention heads in the base transformer model.
+#         num_layers (`int`): The number of layers in the base transformer model.
+#     """
 
-    num_virtual_tokens: int = field(default=None, metadata={"help": "Number of virtual tokens"})
-    token_dim: int = field(
-        default=None, metadata={"help": "The hidden embedding dimension of the base transformer model"}
-    )
-    num_transformer_submodules: Optional[int] = field(
-        default=None, metadata={"help": "Number of transformer submodules"}
-    )
-    num_attention_heads: Optional[int] = field(default=None, metadata={"help": "Number of attention heads"})
-    num_layers: Optional[int] = field(default=None, metadata={"help": "Number of transformer layers"})
+#     num_virtual_tokens: int = field(default=None, metadata={"help": "Number of virtual tokens"})
+#     token_dim: int = field(
+#         default=None, metadata={"help": "The hidden embedding dimension of the base transformer model"}
+#     )
+#     num_transformer_submodules: Optional[int] = field(
+#         default=None, metadata={"help": "Number of transformer submodules"}
+#     )
+#     num_attention_heads: Optional[int] = field(default=None, metadata={"help": "Number of attention heads"})
+#     num_layers: Optional[int] = field(default=None, metadata={"help": "Number of transformer layers"})
 
-    @property
-    def is_prompt_learning(self) -> bool:
-        r"""
-        Utility method to check if the configuration is for prompt learning.
-        """
-        return True
+#     @property
+#     def is_prompt_learning(self) -> bool:
+#         r"""
+#         Utility method to check if the configuration is for prompt learning.
+#         """
+#         return True

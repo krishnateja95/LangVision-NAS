@@ -37,59 +37,59 @@ from ._buffer_dict import BufferDict
 logger = logging.getLogger(__name__)
 
 
-# @contextmanager
-# def onload_layer(layer):
-#     offloaded_modules = []
-#     for name, module in layer.named_modules():
-#         if name in ["", "base_layer"]:
-#             continue
-#         if hasattr(module, "_hf_hook") and isinstance(module._hf_hook, AlignDevicesHook) and module._hf_hook.offload:
-#             module._hf_hook.pre_forward(module)
-#             offloaded_modules.append(module)
+@contextmanager
+def onload_layer(layer):
+    offloaded_modules = []
+    for name, module in layer.named_modules():
+        if name in ["", "base_layer"]:
+            continue
+        if hasattr(module, "_hf_hook") and isinstance(module._hf_hook, AlignDevicesHook) and module._hf_hook.offload:
+            module._hf_hook.pre_forward(module)
+            offloaded_modules.append(module)
 
-#     base_layer_offload = False
-#     if hasattr(layer, "base_layer") and (
-#         hasattr(layer.base_layer, "_hf_hook")
-#         and isinstance(layer.base_layer._hf_hook, AlignDevicesHook)
-#         and layer.base_layer._hf_hook.offload
-#     ):
-#         # check if the base layer is disk-offloaded (must contain a 'dataset' and an offload index)
-#         if torch.device("meta") in layer.base_layer._hf_hook.original_devices.values() and hasattr(
-#             layer.base_layer._hf_hook.weights_map, "dataset"
-#         ):
-#             # find the disk-offload index (maps modules to safetensors) from the `dataset` (OffloadedWeightsLoader object)
-#             index = layer.base_layer._hf_hook.weights_map.dataset.index
-#             module_name = list(dict(layer.base_layer._hf_hook.weights_map.dataset).keys())[0]  # any module will do
-#             file_name = index[module_name]["safetensors_file"]
-#             base_name_arr = []
-#             # get effective dir name
-#             for i in os.path.split(file_name):
-#                 if "--" in i:
-#                     base_name_arr.append(i)
-#                     break
-#                 base_name_arr.append(i)
-#             base_name = os.path.join(*base_name_arr)
-#             safetensors_filename = base_name + "-merged"
-#         layer.base_layer._hf_hook.pre_forward(layer.base_layer)
-#         base_layer_offload = True
+    base_layer_offload = False
+    if hasattr(layer, "base_layer") and (
+        hasattr(layer.base_layer, "_hf_hook")
+        and isinstance(layer.base_layer._hf_hook, AlignDevicesHook)
+        and layer.base_layer._hf_hook.offload
+    ):
+        # check if the base layer is disk-offloaded (must contain a 'dataset' and an offload index)
+        if torch.device("meta") in layer.base_layer._hf_hook.original_devices.values() and hasattr(
+            layer.base_layer._hf_hook.weights_map, "dataset"
+        ):
+            # find the disk-offload index (maps modules to safetensors) from the `dataset` (OffloadedWeightsLoader object)
+            index = layer.base_layer._hf_hook.weights_map.dataset.index
+            module_name = list(dict(layer.base_layer._hf_hook.weights_map.dataset).keys())[0]  # any module will do
+            file_name = index[module_name]["safetensors_file"]
+            base_name_arr = []
+            # get effective dir name
+            for i in os.path.split(file_name):
+                if "--" in i:
+                    base_name_arr.append(i)
+                    break
+                base_name_arr.append(i)
+            base_name = os.path.join(*base_name_arr)
+            safetensors_filename = base_name + "-merged"
+        layer.base_layer._hf_hook.pre_forward(layer.base_layer)
+        base_layer_offload = True
 
-#     yield
+    yield
 
-#     for module in offloaded_modules:
-#         module._hf_hook.post_forward(module, torch.tensor([]))
+    for module in offloaded_modules:
+        module._hf_hook.post_forward(module, torch.tensor([]))
 
-#     if base_layer_offload:
-#         # re-make weights map (must be on cpu to send params to the disk via memmap if disk offload)
-#         layer.base_layer._hf_hook.weights_map = {
-#             name: param.to("cpu") for name, param in named_module_tensors(layer.base_layer)
-#         }
-#         # offload weights map to disk if original device is the disk
-#         if torch.device("meta") in layer.base_layer._hf_hook.original_devices.values() and hasattr(
-#             layer.base_layer._hf_hook.weights_map, "dataset"
-#         ):
-#             # rewrite directory with merged weights
-#             offload_state_dict(safetensors_filename, layer.base_layer._hf_hook.weights_map)
-#         layer.base_layer._hf_hook.post_forward(layer.base_layer, torch.tensor([]))
+    if base_layer_offload:
+        # re-make weights map (must be on cpu to send params to the disk via memmap if disk offload)
+        layer.base_layer._hf_hook.weights_map = {
+            name: param.to("cpu") for name, param in named_module_tensors(layer.base_layer)
+        }
+        # offload weights map to disk if original device is the disk
+        if torch.device("meta") in layer.base_layer._hf_hook.original_devices.values() and hasattr(
+            layer.base_layer._hf_hook.weights_map, "dataset"
+        ):
+            # rewrite directory with merged weights
+            offload_state_dict(safetensors_filename, layer.base_layer._hf_hook.weights_map)
+        layer.base_layer._hf_hook.post_forward(layer.base_layer, torch.tensor([]))
 
 
 class BaseTuner(nn.Module, ABC):

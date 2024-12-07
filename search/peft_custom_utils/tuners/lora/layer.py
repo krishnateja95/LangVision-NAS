@@ -261,9 +261,6 @@ class Linear(nn.Module, LoraLayer):
                             )
                             .detach()
                         )
-                        # We need to cache weight_norm because it has to be based on the original weights. We
-                        # cannot calculate it on the fly based on the merged weights when unmerging because its a
-                        # different value
                         self._cache_store(f"{active_adapter}-weight_norm", weight_norm)
                         dora_factor = self.lora_magnitude_vector[active_adapter].weight / weight_norm
                         dora_factor = transpose(dora_factor.view(-1, 1), self.fan_in_fan_out)

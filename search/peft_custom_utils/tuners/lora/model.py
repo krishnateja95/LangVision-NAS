@@ -19,7 +19,7 @@ from ...tuners.tuners_utils import (
     BaseTuner,
     BaseTunerLayer,
     check_target_module_exists,
-    # onload_layer,
+    onload_layer,
     replicate_layers,
 )
 

@@ -411,6 +411,8 @@ def main(**kwargs):
         wandb_run,
     )
 
+    
+
     results["trainable_params"] = trainable_params
     results["all_param"] = all_param
 

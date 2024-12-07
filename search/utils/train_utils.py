@@ -301,6 +301,10 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
     
     if train_config.enable_fsdp and not train_config.use_peft and rank==0:
         save_train_params(train_config, fsdp_config, rank)
+
+    if train_config.enable_fsdp and train_config.use_peft and rank==0:
+        model.merge_and_unload()
+        print("model", model)
     results["best_eval"] = best_eval
     
     return results

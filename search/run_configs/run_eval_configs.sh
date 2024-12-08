@@ -29,7 +29,9 @@ for rank in 8; do
                                                 --output_dir "/lus/grand/projects/datascience/krishnat/model_weights/LLaMA/llama_cache/output_dir" \
                                                 --profiler_dir "/lus/grand/projects/datascience/krishnat/model_weights/LLaMA/llama_cache/profile_dir" \
                                                 --lora_rank $rank \
-                                                --lora_adapters $lora_adapters
+                                                --lora_adapters $lora_adapters \
+                                                --finetune_model_dir "/lus/grand/projects/datascience/krishnat/krishnat_HF_weights/Llama-3.2-11B-Vision-finetuned" \
+                                                --HF_repo "krishnateja95/Llama-3.2-11B-Vision-ocrvqa-finetuned"
     done
 done
                                             

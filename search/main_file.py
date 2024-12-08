@@ -2,7 +2,10 @@
 # This software may be used and distributed according to the terms of the Llama 2 Community License Agreement.
 
 import fire
-from finetuning import main
+from search import main
+
+from huggingface_hub import login
+login("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")
 
 if __name__ == "__main__":
 

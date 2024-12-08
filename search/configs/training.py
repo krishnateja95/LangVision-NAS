@@ -51,3 +51,6 @@ class train_config:
     profiler_dir: str = "PATH/to/save/profiler/results" # will be used if using profiler
     lora_rank: int = 8 # LoRA Rank
     lora_adapters: str = 'qkv' # LoRA Adapters
+    finetune_model_dir: str = "/lus/grand/projects/datascience/krishnat/krishnat_HF_weights/Llama-3.2-11B-Vision-ocrvqa-finetuned" # finetune_model_dir
+    HF_repo: str = "krishnateja95/Llama-3.2-11B-Vision-ocrvqa-finetuned" # HF_repo
+    

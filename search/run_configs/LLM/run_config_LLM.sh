@@ -7,3 +7,5 @@ torchrun --nnodes 1 --nproc_per_node 4  finetuning.py \
                                          --use_peft \
                                         --peft_method lora \ 
                                         --output_dir Path/to/save/PEFT/model \
+
+                                        

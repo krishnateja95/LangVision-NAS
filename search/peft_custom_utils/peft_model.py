@@ -7,7 +7,7 @@ import os
 import warnings
 from contextlib import contextmanager, nullcontext
 from copy import deepcopy
-from dataclasses import dataclass
+# from dataclasses import dataclass
 from typing import Any, Literal, Optional, Union
 
 import packaging.version

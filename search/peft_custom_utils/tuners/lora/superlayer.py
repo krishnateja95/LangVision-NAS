@@ -186,7 +186,6 @@ class Linear(nn.Module, LoraLayer):
         LoraLayer.__init__(self, base_layer, **kwargs)
         self.fan_in_fan_out = fan_in_fan_out
 
-        
         self._active_adapter = adapter_name
         self.update_layer(
             adapter_name,

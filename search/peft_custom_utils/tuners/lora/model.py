@@ -35,12 +35,7 @@ from ...utils import (
 from ...utils.merge_utils import dare_linear, dare_ties, magnitude_prune, task_arithmetic, ties
 from ...utils.other import get_pattern_key
 
-# from .aqlm import dispatch_aqlm
-# from .awq import dispatch_awq
 from .config import LoraConfig
-# from .eetq import dispatch_eetq
-# from .gptq import dispatch_gptq
-# from .hqq import dispatch_hqq
 from .layer import LoraLayer, dispatch_default
 from .torchao import dispatch_torchao
 from .tp_layer import dispatch_megatron

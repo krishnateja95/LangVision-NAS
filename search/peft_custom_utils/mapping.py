@@ -24,7 +24,7 @@ def get_peft_config(config_dict: dict[str, Any]) -> PeftConfig:
 
 
 def get_peft_model(model: PreTrainedModel, peft_config: PeftConfig, adapter_name: str = "default", mixed: bool = False, autocast_adapter_dtype: bool = True,
-                   revision: Optional[str] = None, low_cpu_mem_usage: bool = False):
+                   revision: Optional[str] = None, low_cpu_mem_usage: bool = False, rank:int = 0, search_space: list = []):
     model_config = BaseTuner.get_model_config(model)
     old_name = peft_config.base_model_name_or_path
     new_name = model.__dict__.get("name_or_path", None)
@@ -36,10 +36,6 @@ def get_peft_model(model: PreTrainedModel, peft_config: PeftConfig, adapter_name
                 f"peft config has already set base model revision to {peft_config.revision}, overwriting with revision {revision}"
             )
         peft_config.revision = revision
-
-
-    # if mixed:
-    #     return PeftMixedModel(model, peft_config, adapter_name=adapter_name)
 
     if peft_config.task_type not in MODEL_TYPE_TO_PEFT_MODEL_MAPPING.keys() and not peft_config.is_prompt_learning:
         return PeftModel(
@@ -53,7 +49,7 @@ def get_peft_model(model: PreTrainedModel, peft_config: PeftConfig, adapter_name
     if peft_config.is_prompt_learning:
         peft_config = _prepare_prompt_learning_config(peft_config, model_config)
     
-    return MODEL_TYPE_TO_PEFT_MODEL_MAPPING[peft_config.task_type](model, peft_config, adapter_name=adapter_name, autocast_adapter_dtype=autocast_adapter_dtype)
+    return MODEL_TYPE_TO_PEFT_MODEL_MAPPING[peft_config.task_type](model = model, peft_config = peft_config, adapter_name=adapter_name, autocast_adapter_dtype=autocast_adapter_dtype, rank=rank, search_space = search_space)
 
 
 def inject_adapter_in_model(peft_config: PeftConfig, model: torch.nn.Module, adapter_name: str = "default", low_cpu_mem_usage: bool = False):

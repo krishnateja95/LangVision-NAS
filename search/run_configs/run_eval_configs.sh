@@ -8,8 +8,8 @@ export HF_HOME="/lus/grand/projects/datascience/krishnat/model_weights/LLaMA/lla
 
 cd ../ 
 
-for rank in 8 16 32 64; do
-    for lora_adapters in "qkvgud" "qkv"; do 
+for rank in 8; do
+    for lora_adapters in "qkvgud"; do 
         torchrun --nnodes 1 --nproc_per_node 4 main_file.py \
                                                 --enable_fsdp \
                                                 --lr 1e-5 \

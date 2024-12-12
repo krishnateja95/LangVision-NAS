@@ -1,6 +1,7 @@
 from .integrations import map_cache_to_layer_device_map
 
 from .peft_types import PeftType, TaskType
+from .constants import INCLUDE_LINEAR_LAYERS_SHORTHAND
 from .other import (
     TRANSFORMERS_MODELS_TO_PREFIX_TUNING_POSTPROCESS_MAPPING,
     TRANSFORMERS_MODELS_TO_LORA_TARGET_MODULES_MAPPING,

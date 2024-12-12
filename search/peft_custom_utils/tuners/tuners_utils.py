@@ -19,15 +19,18 @@ from torch import nn
 from transformers import PreTrainedModel
 from transformers.pytorch_utils import Conv1D
 
-from peft.utils import INCLUDE_LINEAR_LAYERS_SHORTHAND
-from peft.utils.constants import (
+import sys
+sys.path.append("../")
+
+from ..utils.constants import (
     DUMMY_MODEL_CONFIG,
     DUMMY_TARGET_MODULES,
     EMBEDDING_LAYER_NAMES,
     MIN_TARGET_MODULES_FOR_OPTIMIZATION,
     SEQ_CLS_HEAD_NAMES,
+    INCLUDE_LINEAR_LAYERS_SHORTHAND
 )
-from peft.utils.peft_types import PeftType, TaskType
+from ..utils.peft_types import PeftType, TaskType
 
 from ..config import PeftConfig
 from ..utils import ModulesToSaveWrapper, _get_submodules
@@ -93,13 +96,7 @@ def onload_layer(layer):
 
 
 class BaseTuner(nn.Module, ABC):
-    def __init__(
-        self,
-        model,
-        peft_config: Union[PeftConfig, dict[str, PeftConfig]],
-        adapter_name: str,
-        low_cpu_mem_usage: bool = False,
-    ) -> None:
+    def __init__(self, model, peft_config: Union[PeftConfig, dict[str, PeftConfig]], adapter_name: str, low_cpu_mem_usage: bool = False, search_space: list = []):
         super().__init__()
 
         self.model = model
@@ -118,13 +115,18 @@ class BaseTuner(nn.Module, ABC):
                 # user is adding a dict of PeftConfigs
                 self.peft_config.update(peft_config)
 
+
         self.active_adapter: str | list[str] = adapter_name
         self._pre_injection_hook(self.model, self.peft_config[adapter_name], adapter_name)
         if peft_config != PeftType.XLORA or peft_config[adapter_name] != PeftType.XLORA:
-            self.inject_adapter(self.model, adapter_name, low_cpu_mem_usage=low_cpu_mem_usage)
+            self.inject_adapter(self.model, adapter_name, low_cpu_mem_usage=low_cpu_mem_usage, search_space = search_space)
 
         self.model.peft_config = self.peft_config
 
+    def get_sampled_network(self, rank):
+        print("rank is", rank)
+        return 
+    
     @property
     def active_adapters(self) -> list[str]:
         if isinstance(self.active_adapter, str):
@@ -208,10 +210,6 @@ class BaseTuner(nn.Module, ABC):
                         param.data = param.data.to(torch.float32)
 
     def _check_merge_allowed(self):
-        """Helper method to check whether the adapter can be merged.
-
-        Raise a ValueError if it is not possible to merge the adapter with the given configuration.
-        """
         example_code = textwrap.dedent(
             """
             ```python
@@ -243,9 +241,8 @@ class BaseTuner(nn.Module, ABC):
                 + example_code
             )
 
-    def inject_adapter(
-        self, model: nn.Module, adapter_name: str, autocast_adapter_dtype: bool = True, low_cpu_mem_usage: bool = False
-    ) -> None:
+    def inject_adapter(self, model: nn.Module, adapter_name: str, autocast_adapter_dtype: bool = True, low_cpu_mem_usage: bool = False, search_space: list = []):
+
         peft_config = self.peft_config[adapter_name]
         excluded_modules = []
         unmatched_modules = []
@@ -255,7 +252,6 @@ class BaseTuner(nn.Module, ABC):
         _has_modules_to_save = False
 
         model_config = self.get_model_config(model)
-
         peft_config = self._prepare_adapter_config(peft_config, model_config)
 
         self._prepare_model(peft_config, model)
@@ -263,10 +259,8 @@ class BaseTuner(nn.Module, ABC):
 
         uses_dummy_target_modules = getattr(peft_config, "target_modules", None) == DUMMY_TARGET_MODULES
         if uses_dummy_target_modules:
-            # dummy adapter, we allow not matching any module
             key_list = []
 
-        # update peft_config.target_modules if required
         peft_config = _maybe_include_all_linear_layers(peft_config, model)
 
         if (
@@ -285,13 +279,9 @@ class BaseTuner(nn.Module, ABC):
         for key in key_list:
             if not key:
                 continue
-            # Check for modules_to_save in case
-            if _check_for_modules_to_save and any(
-                key.endswith(f"{module_to_save}") for module_to_save in peft_config.modules_to_save
-            ):
-                # Optionally set the modules to save
+            if _check_for_modules_to_save and any(key.endswith(f"{module_to_save}") for module_to_save in peft_config.modules_to_save):
                 parent, target, target_name = _get_submodules(model, key)
-
+                
                 if not isinstance(target, ModulesToSaveWrapper):
                     new_module = ModulesToSaveWrapper(target, adapter_name)
                     setattr(parent, target_name, new_module)
@@ -311,11 +301,10 @@ class BaseTuner(nn.Module, ABC):
                 parent, target, target_name = _get_submodules(model, key)
                 ctx = init_empty_weights if low_cpu_mem_usage else nullcontext
                 with ctx():
-                    self._create_and_replace(peft_config, adapter_name, target, target_name, parent, current_key=key)
+                    self._create_and_replace(peft_config, adapter_name, target, target_name, parent, current_key=key, search_space = search_space)
 
         if not self.targeted_module_names and not uses_dummy_target_modules:
             if excluded_modules and not unmatched_modules:
-                # All targeted modules were excluded
                 raise ValueError(
                     "All modules were excluded. This is likely unintended. "
                     "Check your `target_modules` and `exclude_modules` configuration."
@@ -428,6 +417,10 @@ class BaseTunerLayer(ABC):
             base_layer = base_layer.base_layer
         return base_layer
 
+    def get_sampled_network(self, rank):
+        print("rank is", rank)
+        return
+    
     @property
     def weight(self) -> torch.Tensor:
         base_layer = self.get_base_layer()
@@ -738,13 +731,7 @@ def _maybe_include_all_linear_layers(peft_config: PeftConfig, model: nn.Module) 
 
 
 def check_adapters_to_merge(module: BaseTunerLayer, adapter_names: Optional[list[str]] = None) -> list[str]:
-    """
-    Helper function to check which adapters should be merged.
-
-    Only return those adapters that are not already merged. Give a warning if some or all of the adapters are already
-    merged.
-
-    """
+    
     if adapter_names is None:
         adapter_names = module.active_adapters
     if isinstance(adapter_names, str):

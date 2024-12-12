@@ -7,76 +7,83 @@ from typing import Any, Optional, Union
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from accelerate.utils.imports import is_xpu_available
-from torch import svd_lowrank
-from transformers.pytorch_utils import Conv1D
-
 from peft.tuners.tuners_utils import BaseTunerLayer, check_adapters_to_merge
-from peft.utils.integrations import dequantize_module_weight, gather_params_ctx, get_bnb_param_type
 from peft.utils.other import transpose
 
-from .config import LoraConfig
-from .dora import DoraConv2dLayer, DoraConv3dLayer, DoraEmbeddingLayer, DoraLinearLayer, _DoraConvNdLayer
-
-class LoraLayer(BaseTunerLayer):
+class LoraLayer(nn.Module):
     adapter_layer_names = ("lora_A", "lora_B", "lora_embedding_A", "lora_embedding_B")
     other_param_names = ("r", "lora_alpha", "scaling", "lora_dropout")
 
-    def __init__(self, base_layer: nn.Module, ephemeral_gpu_offload: bool = False, **kwargs) -> None:
+    def __init__(self, base_layer, peft_config):
         
         self.base_layer = base_layer
-        self.r = {}
-        self.lora_alpha = {}
+        self.peft_config = peft_config
+        
+        self.lora_alpha = peft_config.lora_alpha
         self.scaling = {}
         
-        self.lora_dropout = nn.ModuleDict({})
-        self.lora_A = nn.ModuleDict({})
-        self.lora_B = nn.ModuleDict({})
+        self.lora_dropout = peft_config.lora_dropout
         
-        # For Embedding layer
-        self.lora_embedding_A = nn.ParameterDict({})
-        self.lora_embedding_B = nn.ParameterDict({})
+        self.init_lora_weights = peft_config.init_lora_weights
+        self.use_rslora = peft_config.use_rslora
+        self.use_dora = peft_config.use_dora 
         
-        # Mark the weight as unmerged
+        self.lora_magnitude_vector = torch.nn.ModuleDict()  # for DoRA
+
         self._disable_adapters = False
         self.merged_adapters = []
-        self.use_dora: dict[str, bool] = {}
-        self.lora_bias: dict[str, bool] = {}
-        self.lora_magnitude_vector = torch.nn.ModuleDict()  # for DoRA
-        self._caches: dict[str, Any] = {}
-        self.ephemeral_gpu_offload: bool = ephemeral_gpu_offload
-        self.kwargs = kwargs
-
-        base_layer = self.get_base_layer()
-        in_features, out_features = base_layer.in_features, base_layer.out_features
-
-        self.in_features = in_features
-        self.out_features = out_features
         
+        self.in_features = base_layer.in_features
+        self.out_features = base_layer.out_features
+        self.lora_bias = peft_config.lora_bias
 
-    def superlayer(self, adapter_name, lora_alpha, lora_dropout, init_lora_weights, use_rslora, search_space, use_dora: bool = False, lora_bias: bool = False):
-        
-        search_space.sort()
-        max_r = max(search_space)
-        self.alpha = nn.Parameter(torch.rand(len(search_space)), requires_grad=True)
+        if peft_config.supernet:
+            self.alpha_params = nn.Parameter(torch.rand(len(self.peft_config.search_space)), requires_grad=True)
+            
+            self.max_r = max(self.peft_config.search_space)
 
-        self.lora_alpha[adapter_name] = lora_alpha
-        
-        if lora_dropout > 0.0:
-            lora_dropout_layer = nn.Dropout(p=lora_dropout)
+            self.lora_A = nn.Linear(self.in_features, self.max_r, bias=False)
+            self.lora_B = nn.Linear(self.max_r, self.out_features, bias=self.lora_bias)
+
+
+            if self.use_rslora:
+                self.scaling = self.lora_alpha / math.sqrt(self.max_r)
+            else:
+                self.scaling = self.lora_alpha / self.max_r
+
         else:
-            lora_dropout_layer = nn.Identity()
+            self.r = self.peft_config.r
+
+            self.lora_A = nn.Linear(self.in_features, self.r, bias=False)
+            self.lora_B = nn.Linear(self.r, self.out_features, bias=self.lora_bias)
+
+
+            if self.use_rslora:
+                self.scaling = self.lora_alpha / math.sqrt(self.r)
+            else:
+                self.scaling = self.lora_alpha / self.r
+
+        self.lora_A_bias = False
+        self.lora_A_bias = self.lora_bias
+
+        if self.lora_dropout > 0.0:
+            self.lora_dropout_layer = nn.Dropout(p=self.lora_dropout)
+        else:
+            self.lora_dropout_layer = nn.Identity()
+        
+        self.reset_lora_parameters(adapter_name, init_lora_weights)
+
+
+    def superlayer(self):
+        
+        
+        
+        
+        
 
         self.lora_dropout.update(nn.ModuleDict({adapter_name: lora_dropout_layer}))
         
-        self.lora_A[adapter_name] = nn.Linear(self.in_features, max_r, bias=False)
-        self.lora_B[adapter_name] = nn.Linear(max_r, self.out_features, bias=lora_bias)
-        self.alpha_params = nn.Parameter(torch.rand(len(search_space)), requires_grad=True)
-
-        self.lora_bias[adapter_name] = lora_bias
-
-        self.lora_A_bias = False
-        self.lora_A_bias = lora_bias
+        
 
         if use_rslora:
             self.scaling[adapter_name] = lora_alpha / math.sqrt(max_r)
@@ -94,8 +101,6 @@ class LoraLayer(BaseTunerLayer):
         return
 
     def update_layer(self, adapter_name, r, lora_alpha, lora_dropout, init_lora_weights, use_rslora, search_space, use_dora: bool = False, lora_bias: bool = False):
-
-        # self.alpha = nn.Parameter(torch.rand(len(search_space)), requires_grad=True, dtype = torch.float16)
 
         if r <= 0:
             raise ValueError(f"`r` should be a positive integer value but the value passed is {r}")
@@ -130,48 +135,7 @@ class LoraLayer(BaseTunerLayer):
 
         self.set_adapter(self.active_adapters)
 
-    def reset_lora_parameters(self, adapter_name, init_lora_weights):
-        if init_lora_weights is False:
-            return
-
-        if adapter_name in self.lora_A.keys():
-            if init_lora_weights is True:
-                nn.init.kaiming_uniform_(self.lora_A[adapter_name].weight, a=math.sqrt(5))
-            elif init_lora_weights.lower() == "gaussian":
-                nn.init.normal_(self.lora_A[adapter_name].weight, std=1 / self.r[adapter_name])
-            else:
-                raise ValueError(f"Unknown initialization {init_lora_weights}")
-            nn.init.zeros_(self.lora_B[adapter_name].weight)
-            if self.lora_bias[adapter_name]:
-                nn.init.zeros_(self.lora_B[adapter_name].bias)
-        if adapter_name in self.lora_embedding_A.keys():
-            nn.init.zeros_(self.lora_embedding_A[adapter_name])
-            nn.init.normal_(self.lora_embedding_B[adapter_name])
-            if self.lora_bias[adapter_name]:
-                nn.init.zeros_(self.lora_embedding_B[adapter_name].bias)
-
-class Linear(nn.Module, LoraLayer):
-    def __init__(self, base_layer, adapter_name: str, r: int = 0, lora_alpha: int = 1, lora_dropout: float = 0.0, fan_in_fan_out: bool = False,
-        is_target_conv_1d_layer: bool = False, init_lora_weights: Union[bool, str] = True, use_rslora: bool = False, use_dora: bool = False,
-        lora_bias: bool = False, search_space: list = [], **kwargs):
-        super().__init__()
-        LoraLayer.__init__(self, base_layer, **kwargs)
-
-        self.fan_in_fan_out = fan_in_fan_out
-
-        self._active_adapter = adapter_name
-        self.update_layer(
-            adapter_name,
-            r,
-            lora_alpha=lora_alpha,
-            lora_dropout=lora_dropout,
-            init_lora_weights=init_lora_weights,
-            use_rslora=use_rslora,
-            use_dora=use_dora,
-            lora_bias=lora_bias,
-            search_space=search_space
-        )
-
+    
     def forward(self, x: torch.Tensor, *args: Any, **kwargs: Any) -> torch.Tensor:
         adapter_names = kwargs.pop("adapter_names", None)
 
@@ -216,6 +180,27 @@ class Linear(nn.Module, LoraLayer):
             result = result.to(torch_result_dtype)
 
         return result
+
+
+    def reset_lora_parameters(self, adapter_name, init_lora_weights):
+        if init_lora_weights is False:
+            return
+
+        if adapter_name in self.lora_A.keys():
+            if init_lora_weights is True:
+                nn.init.kaiming_uniform_(self.lora_A[adapter_name].weight, a=math.sqrt(5))
+            elif init_lora_weights.lower() == "gaussian":
+                nn.init.normal_(self.lora_A[adapter_name].weight, std=1 / self.r[adapter_name])
+            else:
+                raise ValueError(f"Unknown initialization {init_lora_weights}")
+            nn.init.zeros_(self.lora_B[adapter_name].weight)
+            if self.lora_bias[adapter_name]:
+                nn.init.zeros_(self.lora_B[adapter_name].bias)
+        if adapter_name in self.lora_embedding_A.keys():
+            nn.init.zeros_(self.lora_embedding_A[adapter_name])
+            nn.init.normal_(self.lora_embedding_B[adapter_name])
+            if self.lora_bias[adapter_name]:
+                nn.init.zeros_(self.lora_embedding_B[adapter_name].bias)
     
     def slice_lora_weights(self):
         
@@ -340,6 +325,32 @@ class Linear(nn.Module, LoraLayer):
             self.lora_B[adapter].weight.data = weight_B.to(dtype)
 
         return output_tensor
+
+class Linear(nn.Module, LoraLayer):
+    def __init__(self, base_layer, adapter_name: str, r: int = 0, lora_alpha: int = 1, lora_dropout: float = 0.0, fan_in_fan_out: bool = False,
+        is_target_conv_1d_layer: bool = False, init_lora_weights: Union[bool, str] = True, use_rslora: bool = False, use_dora: bool = False,
+        lora_bias: bool = False, search_space: list = [], **kwargs):
+        super().__init__()
+        LoraLayer.__init__(self, base_layer, **kwargs)
+
+        self.fan_in_fan_out = fan_in_fan_out
+
+        self._active_adapter = adapter_name
+        self.update_layer(
+            adapter_name,
+            r,
+            lora_alpha=lora_alpha,
+            lora_dropout=lora_dropout,
+            init_lora_weights=init_lora_weights,
+            use_rslora=use_rslora,
+            use_dora=use_dora,
+            lora_bias=lora_bias,
+            search_space=search_space
+        )
+
+    
+    
+    
 
     
 

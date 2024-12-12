@@ -1,34 +1,7 @@
 Hardware,Num of Hardware,Model,Trainable,All params,Dataset,target_modules,LoRA Rank,Avg Epoch Time,Eval PPL
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,8847360,10679068195,ocrvqa,"['gate_proj', 'up_proj', 'down_proj']",4,197.52551946399035,"tensor(1.2406, device='cuda:0')"
-Hardware,Num of Hardware,Model,Trainable,All params,Dataset,target_modules,LoRA Rank,Avg Epoch Time,Eval PPL
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,8847360,10679068195,ocrvqa,"['gate_proj', 'up_proj', 'down_proj']",4,197.49077686200812,"tensor(1.2406, device='cuda:1')"
-Hardware,Num of Hardware,Model,Trainable,All params,Dataset,target_modules,LoRA Rank,Avg Epoch Time,Eval PPL
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,8847360,10679068195,ocrvqa,"['gate_proj', 'up_proj', 'down_proj']",4,197.4896557983205,"tensor(1.2406, device='cuda:2')"
-Hardware,Num of Hardware,Model,Trainable,All params,Dataset,target_modules,LoRA Rank,Avg Epoch Time,Eval PPL
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,8847360,10679068195,ocrvqa,"['gate_proj', 'up_proj', 'down_proj']",4,197.47837643732782,"tensor(1.2406, device='cuda:3')"
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,8355840,10678576675,ocrvqa,"['q_proj', 'k_proj', 'v_proj']",8,213.4632813290033,"tensor(1.4795, device='cuda:2')"
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,8355840,10678576675,ocrvqa,"['q_proj', 'k_proj', 'v_proj']",8,213.60409319633618,"tensor(1.4795, device='cuda:0')"
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,8355840,10678576675,ocrvqa,"['q_proj', 'k_proj', 'v_proj']",8,213.5471319356778,"tensor(1.4795, device='cuda:1')"
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,8355840,10678576675,ocrvqa,"['q_proj', 'k_proj', 'v_proj']",8,213.66283638066184,"tensor(1.4795, device='cuda:3')"
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,17694720,10687915555,ocrvqa,"['gate_proj', 'up_proj', 'down_proj']",8,193.5864538353344,"tensor(1.2426, device='cuda:0')"
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,17694720,10687915555,ocrvqa,"['gate_proj', 'up_proj', 'down_proj']",8,193.4739127153298,"tensor(1.2426, device='cuda:1')"
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,17694720,10687915555,ocrvqa,"['gate_proj', 'up_proj', 'down_proj']",8,193.46747980600534,"tensor(1.2426, device='cuda:2')"
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,17694720,10687915555,ocrvqa,"['gate_proj', 'up_proj', 'down_proj']",8,193.4717744193525,"tensor(1.2426, device='cuda:3')"
 
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,266.5392755930079,1.407752275466919
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,266.5417907470255,1.407752275466919
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,266.5244503170252,1.407752275466919
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,266.537976159947,1.407752275466919
-
-
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,252.7026216390077,1.4081063270568848
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,252.3991196770221,1.4081063270568848
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,252.72488274495117,1.4081063270568848
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,251.82500315603102,1.4081063270568848
-
-
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,252.27990793599747,1.4079550504684448
-
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,252.78861326898914,1.4080562591552734
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,266.989997407014,1.4075382947921753
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,252.1291889649583,1.4077277183532715
+Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,265.16847674991004,1.4077712297439575
+Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,260.33857855398674,1.408085823059082
+Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,264.10045184299815,1.4080880880355835
+Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,257.84119108505547,1.4077072143554688
+Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,251.99565235804766,1.4082624912261963

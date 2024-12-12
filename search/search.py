@@ -13,6 +13,8 @@ import torch
 import torch.optim as optim
 from accelerate.utils import is_xpu_available
 
+from utils.search_utils import get_named_parameters
+
 from configs import (
     fsdp_config as FSDP_CONFIG,
     quantization_config as QUANTIZATION_CONFIG,
@@ -46,7 +48,7 @@ from utils.train_utils import (
     setup_environ_flags,
     train,
 )
-from peft import PeftModel
+
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
 from torch.distributed.fsdp.fully_sharded_data_parallel import CPUOffload
 from torch.optim.lr_scheduler import StepLR
@@ -58,7 +60,6 @@ from transformers import (
     LlamaForCausalLM,
     MllamaForConditionalGeneration,
 )
-
 
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 
@@ -212,11 +213,31 @@ def main(**kwargs):
             peft_config = model.peft_config
             
         else:
+            search_space = [8, 16, 32, 64]
             from peft_custom_utils import get_peft_model
             peft_config = generate_peft_config(train_config, kwargs)
-            model = get_peft_model(model, peft_config)
-            print("Created Lora model")
+            model = get_peft_model(model, peft_config, rank=rank, search_space = search_space)
+            # model.add_adapters(peft_config)
+            if rank == 0:
+                print("lora model", model)
+            exit()
+        
+            
+            
+            # model.get_sampled_network(rank)
+            
+            # if rank == 0:
+            #     get_named_parameters(model)
+                # print("Created Lora model", model)
+            # exit()
+            
+            # from utils.search_utils import get_searched_network
+            # searched_net = get_searched_network(model, peft_config)
+            
             # model.merge_and_unload()
+            # print(sampled_net_config)
+            # exit()
+
         if wandb_run:
             wandb_run.config.update(peft_config)
         model.print_trainable_parameters()
@@ -437,6 +458,7 @@ def main(**kwargs):
             torch_dtype=torch.float16 if train_config.use_fp16 else torch.bfloat16,
         )
     
+    from peft import PeftModel
     lora_model = PeftModel.from_pretrained(model, train_config.output_dir)
     merged_model = lora_model.merge_and_unload()
     print("merged_model", merged_model)

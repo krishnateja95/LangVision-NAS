@@ -33,11 +33,9 @@ class LoraLayer(BaseTunerLayer):
         self.lora_A = nn.ModuleDict({})
         self.lora_B = nn.ModuleDict({})
         
-        # For Embedding layer
         self.lora_embedding_A = nn.ParameterDict({})
         self.lora_embedding_B = nn.ParameterDict({})
         
-        # Mark the weight as unmerged
         self._disable_adapters = False
         self.merged_adapters = []
         self.use_dora: dict[str, bool] = {}
@@ -91,6 +89,9 @@ class LoraLayer(BaseTunerLayer):
 
         self.if_supernet = True
 
+        return
+
+    def superlayer_forward(self):
         return
 
     def update_layer(self, adapter_name, r, lora_alpha, lora_dropout, init_lora_weights, use_rslora, search_space, use_dora: bool = False, lora_bias: bool = False):
@@ -171,6 +172,9 @@ class Linear(nn.Module, LoraLayer):
             lora_bias=lora_bias,
             search_space=search_space
         )
+
+    def get_sampled_network(self, peft_config):
+        print("Inside Lora Linear layer kasdjfoasjg")
 
     def forward(self, x: torch.Tensor, *args: Any, **kwargs: Any) -> torch.Tensor:
         adapter_names = kwargs.pop("adapter_names", None)

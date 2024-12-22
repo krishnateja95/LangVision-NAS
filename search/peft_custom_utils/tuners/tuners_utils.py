@@ -123,8 +123,8 @@ class BaseTuner(nn.Module, ABC):
 
         self.model.peft_config = self.peft_config
 
-    def get_sampled_network(self, rank):
-        print("rank is", rank)
+    def get_sampled_network(self):
+        print("Inside Baseturner")
         return 
     
     @property

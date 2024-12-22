@@ -4,9 +4,6 @@
 import fire
 from search import main
 
-# from huggingface_hub import login
-# login("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")
-
 if __name__ == "__main__":
 
     import time, os

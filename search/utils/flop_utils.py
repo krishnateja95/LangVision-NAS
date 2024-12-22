@@ -85,3 +85,22 @@ class FlopMeasure(FlopCounterMode):
             return super().__torch_dispatch__(func, types, args, kwargs)
         # otherwise, just return the original output
         return func(*args, **kwargs)
+
+
+
+
+def get_nb_trainable_parameters(model):
+    
+    trainable_params = 0
+    all_param = 0
+
+    for _, param in model.named_parameters():
+        num_params = param.numel()
+        
+        all_param += num_params
+        if param.requires_grad:
+            trainable_params += num_params
+
+    trainable_params_percent = 100 * trainable_params / all_param
+
+    return trainable_params, all_param, trainable_params_percent

@@ -27,7 +27,7 @@ from transformers.utils import (
 
 from transformers.models.mllama.configuration_mllama import MllamaConfig, MllamaTextConfig, MllamaVisionConfig
 
-from peft_utils import LoraLayer
+from models.peft_utils import Lora_Layer
 
 logger = logging.get_logger(__name__)
 
@@ -114,9 +114,7 @@ class MllamaPrecomputedPositionEmbedding(nn.Module):
         position_embedding = torch.randn(self.num_patches, self.hidden_size)
         self.embedding = nn.Parameter(self.scale * position_embedding)
 
-        self.tile_embedding = nn.Embedding(
-            self.max_aspect_ratio_id + 1, self.max_num_tiles * self.num_patches * self.hidden_size
-        )
+        self.tile_embedding = nn.Embedding(self.max_aspect_ratio_id + 1, self.max_num_tiles * self.num_patches * self.hidden_size)
 
     def forward(self, hidden_state: torch.Tensor, aspect_ratio_ids: torch.Tensor) -> torch.Tensor:
         gated_position_embedding = (1 - self.gate.tanh()) * self.embedding
@@ -141,9 +139,25 @@ class MllamaVisionMLP(nn.Module):
         self.fc1 = nn.Linear(config.hidden_size, config.intermediate_size)
         self.fc2 = nn.Linear(config.intermediate_size, config.hidden_size)
 
+    def get_sampled_network(self, peft_config):
+        
+        if "fc1" in peft_config.target_modules:
+            self.fc1.get_sampled_network(peft_config)
+        
+        if "fc2" in peft_config.target_modules:
+            self.fc2.get_sampled_network(peft_config)
+
     def add_adapters(self, peft_config):
-        self.fc1 = LoraLayer(self.fc1, peft_config)
-        self.fc2 = LoraLayer(self.fc2, peft_config)
+        self.fc1 = Lora_Layer(self.fc1, peft_config, "fc1")
+        self.fc2 = Lora_Layer(self.fc2, peft_config, "fc2")
+
+    def merge_adapters(self):
+        self.fc1.merge_adapters()
+        self.fc2.merge_adapters()
+
+        self.fc1 = self.fc1.base_layer
+        self.fc2 = self.fc2.base_layer
+
     
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         hidden_states = self.fc1(hidden_states)
@@ -164,11 +178,36 @@ class MllamaVisionAttention(nn.Module):
         self.v_proj = nn.Linear(self.embed_dim, self.num_heads * self.head_dim, bias=False)
         self.o_proj = nn.Linear(self.num_heads * self.head_dim, self.embed_dim, bias=False)
 
+    def get_sampled_network(self, peft_config):
+
+        if "q_proj" in peft_config.target_modules:
+            self.q_proj.get_sampled_network(peft_config)
+        
+        if "k_proj" in peft_config.target_modules:
+            self.k_proj.get_sampled_network(peft_config)
+        
+        if "v_proj" in peft_config.target_modules:
+            self.v_proj.get_sampled_network(peft_config)
+        
+        if "o_proj" in peft_config.target_modules:
+            self.o_proj.get_sampled_network(peft_config)
+
     def add_adapters(self, peft_config):
-        self.q_proj = LoraLayer(self.q_proj, peft_config)
-        self.k_proj = LoraLayer(self.k_proj, peft_config)
-        self.v_proj = LoraLayer(self.v_proj, peft_config)
-        self.o_proj = LoraLayer(self.o_proj, peft_config)
+        self.q_proj = Lora_Layer(self.q_proj, peft_config, "q_proj")
+        self.k_proj = Lora_Layer(self.k_proj, peft_config, "k_proj")
+        self.v_proj = Lora_Layer(self.v_proj, peft_config, "v_proj")
+        self.o_proj = Lora_Layer(self.o_proj, peft_config, "o_proj")
+
+    def merge_adapters(self):
+        self.q_proj.merge_adapters()
+        self.k_proj.merge_adapters()
+        self.v_proj.merge_adapters()
+        self.o_proj.merge_adapters()
+
+        self.q_proj = self.q_proj.base_layer
+        self.k_proj = self.k_proj.base_layer
+        self.v_proj = self.v_proj.base_layer
+        self.o_proj = self.o_proj.base_layer
 
     def forward(
         self,
@@ -267,9 +306,17 @@ class MllamaVisionEncoderLayer(nn.Module):
             self.gate_attn = nn.Parameter(torch.ones(1) * math.pi / 4)
             self.gate_ffn = nn.Parameter(torch.ones(1) * math.pi / 4)
 
+    def get_sampled_network(self, peft_config):
+        self.self_attn.get_sampled_network(peft_config)
+        self.mlp.get_sampled_network(peft_config)
+        
     def add_adapters(self, peft_config):
         self.self_attn.add_adapters(peft_config)
         self.mlp.add_adapters(peft_config)
+
+    def merge_adapters(self):
+        self.self_attn.merge_adapters()
+        self.mlp.merge_adapters()
 
     def forward(
         self,
@@ -307,10 +354,22 @@ class MllamaVisionEncoder(nn.Module):
         self.layers = nn.ModuleList([MllamaVisionEncoderLayer(config, is_gated) for _ in range(num_layers)])
         self.gradient_checkpointing = False
         self.config = config
-
+    
+    def get_sampled_network(self, peft_config):
+        for layer in self.layers:
+            layer.get_sampled_network(peft_config)
+        
     def add_adapters(self, peft_config):
         for layer in self.layers:
             layer.add_adapters(peft_config)
+
+    def merge_adapters(self):
+        for layer in self.layers:
+            layer.merge_adapters()
+
+    def merge_adapters(self):
+        for layer in self.layers:
+            layer.merge_adapters()
 
     def forward(
         self,
@@ -403,11 +462,36 @@ class MllamaTextCrossAttention(nn.Module):
         self.q_norm = MllamaTextRMSNorm(self.head_dim, eps=config.rms_norm_eps)
         self.k_norm = MllamaTextRMSNorm(self.head_dim, eps=config.rms_norm_eps)
 
+    def get_sampled_network(self, peft_config):
+        if "q_proj" in peft_config.target_modules:
+            self.q_proj.get_sampled_network(peft_config)
+        
+        if "k_proj" in peft_config.target_modules:
+            self.k_proj.get_sampled_network(peft_config)
+        
+        if "v_proj" in peft_config.target_modules:
+            self.v_proj.get_sampled_network(peft_config)
+        
+        if "o_proj" in peft_config.target_modules:
+            self.o_proj.get_sampled_network(peft_config)
+
     def add_adapters(self, peft_config):
-        self.q_proj = LoraLayer(self.q_proj, peft_config)
-        self.k_proj = LoraLayer(self.k_proj, peft_config)
-        self.v_proj = LoraLayer(self.v_proj, peft_config)
-        self.o_proj = LoraLayer(self.o_proj, peft_config)
+        self.q_proj = Lora_Layer(self.q_proj, peft_config, "q_proj")
+        self.k_proj = Lora_Layer(self.k_proj, peft_config, "k_proj")
+        self.v_proj = Lora_Layer(self.v_proj, peft_config, "v_proj")
+        self.o_proj = Lora_Layer(self.o_proj, peft_config, "o_proj")
+
+    def merge_adapters(self):
+        self.q_proj.merge_adapters()
+        self.k_proj.merge_adapters()
+        self.v_proj.merge_adapters()
+        self.o_proj.merge_adapters()
+
+        self.q_proj = self.q_proj.base_layer
+        self.k_proj = self.k_proj.base_layer
+        self.v_proj = self.v_proj.base_layer
+        self.o_proj = self.o_proj.base_layer
+
 
     def forward(
         self,
@@ -582,12 +666,38 @@ class MllamaTextSelfAttention(nn.Module):
         self.v_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=False)
         self.o_proj = nn.Linear(self.num_heads * self.head_dim, self.hidden_size, bias=False)
 
-    def add_adapters(self, peft_config):
-        self.q_proj = LoraLayer(self.q_proj, peft_config)
-        self.k_proj = LoraLayer(self.k_proj, peft_config)
-        self.v_proj = LoraLayer(self.v_proj, peft_config)
-        self.o_proj = LoraLayer(self.o_proj, peft_config)
+    def get_sampled_network(self, peft_config):
+        if "q_proj" in peft_config.target_modules:
+            self.q_proj.get_sampled_network(peft_config)
+        
+        if "k_proj" in peft_config.target_modules:
+            self.k_proj.get_sampled_network(peft_config)
+        
+        if "v_proj" in peft_config.target_modules:
+            self.v_proj.get_sampled_network(peft_config)
+        
+        if "o_proj" in peft_config.target_modules:
+            self.o_proj.get_sampled_network(peft_config)
+        
 
+
+    def add_adapters(self, peft_config):
+        self.q_proj = Lora_Layer(self.q_proj, peft_config, "q_proj")
+        self.k_proj = Lora_Layer(self.k_proj, peft_config, "k_proj")
+        self.v_proj = Lora_Layer(self.v_proj, peft_config, "v_proj")
+        self.o_proj = Lora_Layer(self.o_proj, peft_config, "o_proj")
+
+    def merge_adapters(self):
+        self.q_proj.merge_adapters()
+        self.k_proj.merge_adapters()
+        self.v_proj.merge_adapters()
+        self.o_proj.merge_adapters()
+
+        
+        self.q_proj = self.q_proj.base_layer
+        self.k_proj = self.k_proj.base_layer
+        self.v_proj = self.v_proj.base_layer
+        self.o_proj = self.o_proj.base_layer
 
     def forward(
         self,
@@ -734,10 +844,29 @@ class MllamaTextMLP(nn.Module):
         # Ignore copy
         self.act_fn = ACT2FN[config.hidden_act]
 
+    def get_sampled_network(self, peft_config):
+        if "gate_proj" in peft_config.target_modules:
+            self.gate_proj.get_sampled_network(peft_config)
+        
+        if "up_proj" in peft_config.target_modules:
+            self.up_proj.get_sampled_network(peft_config)
+        
+        if "down_proj" in peft_config.target_modules:
+            self.down_proj.get_sampled_network(peft_config)
+
     def add_adapters(self, peft_config):
-        self.gate_proj = LoraLayer(self.gate_proj, peft_config)
-        self.up_proj   = LoraLayer(self.up_proj, peft_config)
-        self.down_proj = LoraLayer(self.down_proj, peft_config)
+        self.gate_proj = Lora_Layer(self.gate_proj, peft_config, "gate_proj")
+        self.up_proj   = Lora_Layer(self.up_proj, peft_config, "up_proj")
+        self.down_proj = Lora_Layer(self.down_proj, peft_config, "down_proj")
+    
+    def merge_adapters(self):
+        self.gate_proj.merge_adapters()
+        self.up_proj.merge_adapters()
+        self.down_proj.merge_adapters()
+
+        self.gate_proj = self.gate_proj.base_layer
+        self.up_proj = self.up_proj.base_layer
+        self.down_proj = self.down_proj.base_layer
         
     def forward(self, x):
         return self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
@@ -756,9 +885,18 @@ class MllamaSelfAttentionDecoderLayer(nn.Module):
 
         self.layer_idx = layer_idx
 
+    def get_sampled_network(self, peft_config):
+        self.self_attn.get_sampled_network(peft_config)
+        self.mlp.get_sampled_network(peft_config)
+
     def add_adapters(self, peft_config):
         self.self_attn.add_adapters(peft_config)
         self.mlp.add_adapters(peft_config)
+
+    def merge_adapters(self):
+        self.self_attn.merge_adapters()
+        self.mlp.merge_adapters()
+        
 
     def forward(
         self,
@@ -821,9 +959,18 @@ class MllamaCrossAttentionDecoderLayer(torch.nn.Module):
         self.post_attention_layernorm = MllamaTextRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.cross_attn_mlp_gate = torch.nn.Parameter(torch.zeros(1))
 
+    def get_sampled_network(self, peft_config):
+        self.cross_attn.get_sampled_network(peft_config)
+        self.mlp.get_sampled_network(peft_config)
+
     def add_adapters(self, peft_config):
         self.cross_attn.add_adapters(peft_config)
         self.mlp.add_adapters(peft_config)
+
+    def merge_adapters(self):
+        self.cross_attn.merge_adapters()
+        self.mlp.merge_adapters()
+        
 
     def forward(
         self,
@@ -996,10 +1143,18 @@ class MllamaVisionModel(MllamaPreTrainedModel):
 
         self.post_init()
 
+    def get_sampled_network(self, peft_config):
+        self.transformer.get_sampled_network(peft_config)
+        self.global_transformer.get_sampled_network(peft_config)
+
     def add_adapters(self, peft_config):
         self.transformer.add_adapters(peft_config)
         self.global_transformer.add_adapters(peft_config)
 
+    def merge_adapters(self):
+        self.transformer.merge_adapters()
+        self.global_transformer.merge_adapters()
+        
 
     def get_input_embeddings(self):
         return self.patch_embedding
@@ -1165,9 +1320,18 @@ class MllamaTextModel(MllamaPreTrainedModel):
         self.gradient_checkpointing = False
         self.post_init()
     
+    def get_sampled_network(self, peft_config):
+        for layer in self.layers:
+            layer.get_sampled_network(peft_config)
+
     def add_adapters(self, peft_config):
         for layer in self.layers:
             layer.add_adapters(peft_config)
+
+    def merge_adapters(self):
+        for layer in self.layers:
+            layer.merge_adapters()
+
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1400,6 +1564,18 @@ class MllamaForCausalLM(MllamaPreTrainedModel, GenerationMixin):
 
         self.post_init()
 
+    
+    def get_sampled_network(self, peft_config):
+        self.model.get_sampled_network(peft_config)
+
+    def add_adapters(self, peft_config):
+        self.model.add_adapters(peft_config)
+
+    def merge_adapters(self):
+        self.model.merge_adapters()
+        
+        
+
     def get_input_embeddings(self):
         return self.model.embed_tokens
 
@@ -1550,10 +1726,17 @@ class MllamaForConditionalGeneration(MllamaPreTrainedModel, GenerationMixin):
         )
         self.post_init()
 
+    def get_sampled_network(self, peft_config):
+        self.vision_model.get_sampled_network(peft_config)
+        self.language_model.get_sampled_network(peft_config)
+
     def add_adapters(self, peft_config):
         self.vision_model.add_adapters(peft_config)
         self.language_model.add_adapters(peft_config)
-
+    
+    def merge_adapters(self):
+        self.vision_model.merge_adapters()
+        self.language_model.merge_adapters()
 
 
     def get_input_embeddings(self):

@@ -49,6 +49,8 @@ from utils.train_utils import (
     train,
 )
 
+from utils.flop_utils import get_nb_trainable_parameters
+
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
 from torch.distributed.fsdp.fully_sharded_data_parallel import CPUOffload
 from torch.optim.lr_scheduler import StepLR
@@ -58,8 +60,9 @@ from transformers import (
     AutoTokenizer,
     BitsAndBytesConfig,
     LlamaForCausalLM,
-    MllamaForConditionalGeneration,
 )
+
+from models.dense_models.mllama.modeling_mllama_supernet import MllamaForConditionalGeneration 
 
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 
@@ -213,35 +216,29 @@ def main(**kwargs):
             peft_config = model.peft_config
             
         else:
-            search_space = [8, 16, 32, 64]
             from peft_custom_utils import get_peft_model
             peft_config = generate_peft_config(train_config, kwargs)
-            model = get_peft_model(model, peft_config, rank=rank, search_space = search_space)
-            # model.add_adapters(peft_config)
-            if rank == 0:
-                print("lora model", model)
+            
+            peft_config.lora_bias = None
+            peft_config.search_space = [8, 16, 32, 64]
+            peft_config.supernet = False
+
+            model = get_peft_model(model, peft_config)
+            model.get_sampled_network(peft_config)
+
+            # if rank == 0:
+            #     print(model)
             exit()
         
-            
-            
-            # model.get_sampled_network(rank)
-            
-            # if rank == 0:
-            #     get_named_parameters(model)
-                # print("Created Lora model", model)
-            # exit()
-            
-            # from utils.search_utils import get_searched_network
-            # searched_net = get_searched_network(model, peft_config)
-            
-            # model.merge_and_unload()
-            # print(sampled_net_config)
-            # exit()
-
         if wandb_run:
             wandb_run.config.update(peft_config)
-        model.print_trainable_parameters()
-        trainable_params, all_param = model.get_nb_trainable_parameters()
+        
+        trainable_params, all_param, trainable_params_percent = get_nb_trainable_parameters(model)
+
+        print(
+            f"trainable params: {trainable_params:,d} || all params: {all_param:,d} || trainable%: {100 * trainable_params / all_param:.4f}"
+        )
+        exit()
 
 
     hsdp_device_mesh_plan = None

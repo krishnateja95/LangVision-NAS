@@ -58,13 +58,9 @@ class LoraModel(BaseTuner):
                 "set bias to 'none' for all adapters."
             )
 
-    def get_sampled_network(self, rank):
-        if rank == 0:
-            key_list = [key for key, _ in self.model.named_parameters()]
-            # for key in key_list:
-            #     print(key)
-        print(self.model.get_sampled_network())
-        return True
+    def get_sampled_network(self, peft_config):
+        self.model.get_sampled_network(peft_config)
+        return 
 
 
     @staticmethod

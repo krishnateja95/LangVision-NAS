@@ -27,7 +27,7 @@ from transformers.utils import (
 
 from transformers.models.mllama.configuration_mllama import MllamaConfig, MllamaTextConfig, MllamaVisionConfig
 
-from models.peft_utils import Lora_Layer
+# from models.peft_utils import Lora_Layer
 
 logger = logging.get_logger(__name__)
 
@@ -139,8 +139,14 @@ class MllamaVisionMLP(nn.Module):
         self.fc1 = nn.Linear(config.hidden_size, config.intermediate_size)
         self.fc2 = nn.Linear(config.intermediate_size, config.hidden_size)
 
-    def get_sampled_network(self, peft_config):
+    def initalize_lora_params(self, peft_config):
+        if "fc1" in peft_config.target_modules:
+            self.fc1_alpha_params = nn.Parameter(torch.rand(len(peft_config.search_space), dtype=torch.float16), requires_grad=True)
         
+        if "fc2" in peft_config.target_modules:
+            self.fc2_alpha_params = nn.Parameter(torch.rand(len(peft_config.search_space), dtype=torch.float16), requires_grad=True)
+
+    def get_sampled_network(self, peft_config):
         if "fc1" in peft_config.target_modules:
             self.fc1.get_sampled_network(peft_config)
         
@@ -178,6 +184,19 @@ class MllamaVisionAttention(nn.Module):
         self.v_proj = nn.Linear(self.embed_dim, self.num_heads * self.head_dim, bias=False)
         self.o_proj = nn.Linear(self.num_heads * self.head_dim, self.embed_dim, bias=False)
 
+    def initalize_lora_params(self, peft_config):
+        if "q_proj" in peft_config.target_modules:
+            self.q_proj_alpha_params = nn.Parameter(torch.rand(len(peft_config.search_space), dtype=torch.float16), requires_grad=True)
+        
+        if "k_proj" in peft_config.target_modules:
+            self.k_proj_alpha_params = nn.Parameter(torch.rand(len(peft_config.search_space), dtype=torch.float16), requires_grad=True)
+        
+        if "v_proj" in peft_config.target_modules:
+            self.v_proj_alpha_params = nn.Parameter(torch.rand(len(peft_config.search_space), dtype=torch.float16), requires_grad=True)
+            
+        if "o_proj" in peft_config.target_modules:
+            self.o_proj_alpha_params = nn.Parameter(torch.rand(len(peft_config.search_space), dtype=torch.float16), requires_grad=True)
+
     def get_sampled_network(self, peft_config):
 
         if "q_proj" in peft_config.target_modules:
@@ -191,6 +210,7 @@ class MllamaVisionAttention(nn.Module):
         
         if "o_proj" in peft_config.target_modules:
             self.o_proj.get_sampled_network(peft_config)
+    
 
     def add_adapters(self, peft_config):
         self.q_proj = Lora_Layer(self.q_proj, peft_config, "q_proj")
@@ -309,7 +329,11 @@ class MllamaVisionEncoderLayer(nn.Module):
     def get_sampled_network(self, peft_config):
         self.self_attn.get_sampled_network(peft_config)
         self.mlp.get_sampled_network(peft_config)
-        
+    
+    def initalize_lora_params(self, peft_config):
+        self.self_attn.initalize_lora_params(peft_config)
+        self.mlp.initalize_lora_params(peft_config)
+
     def add_adapters(self, peft_config):
         self.self_attn.add_adapters(peft_config)
         self.mlp.add_adapters(peft_config)
@@ -354,7 +378,11 @@ class MllamaVisionEncoder(nn.Module):
         self.layers = nn.ModuleList([MllamaVisionEncoderLayer(config, is_gated) for _ in range(num_layers)])
         self.gradient_checkpointing = False
         self.config = config
-    
+
+    def initalize_lora_params(self, peft_config):
+        for layer in self.layers:
+            layer.initalize_lora_params(peft_config)
+
     def get_sampled_network(self, peft_config):
         for layer in self.layers:
             layer.get_sampled_network(peft_config)
@@ -461,6 +489,20 @@ class MllamaTextCrossAttention(nn.Module):
 
         self.q_norm = MllamaTextRMSNorm(self.head_dim, eps=config.rms_norm_eps)
         self.k_norm = MllamaTextRMSNorm(self.head_dim, eps=config.rms_norm_eps)
+
+    def initalize_lora_params(self, peft_config):
+        if "q_proj" in peft_config.target_modules:
+            self.q_proj_alpha_params = nn.Parameter(torch.rand(len(peft_config.search_space), dtype=torch.float16), requires_grad=True)
+        
+        if "k_proj" in peft_config.target_modules:
+            self.k_proj_alpha_params = nn.Parameter(torch.rand(len(peft_config.search_space), dtype=torch.float16), requires_grad=True)
+        
+        if "v_proj" in peft_config.target_modules:
+            self.v_proj_alpha_params = nn.Parameter(torch.rand(len(peft_config.search_space), dtype=torch.float16), requires_grad=True)
+            
+        if "o_proj" in peft_config.target_modules:
+            self.o_proj_alpha_params = nn.Parameter(torch.rand(len(peft_config.search_space), dtype=torch.float16), requires_grad=True)
+
 
     def get_sampled_network(self, peft_config):
         if "q_proj" in peft_config.target_modules:
@@ -666,6 +708,20 @@ class MllamaTextSelfAttention(nn.Module):
         self.v_proj = nn.Linear(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=False)
         self.o_proj = nn.Linear(self.num_heads * self.head_dim, self.hidden_size, bias=False)
 
+    def initalize_lora_params(self, peft_config):
+        if "q_proj" in peft_config.target_modules:
+            self.q_proj_alpha_params = nn.Parameter(torch.rand(len(peft_config.search_space), dtype=torch.float16), requires_grad=True)
+        
+        if "k_proj" in peft_config.target_modules:
+            self.k_proj_alpha_params = nn.Parameter(torch.rand(len(peft_config.search_space), dtype=torch.float16), requires_grad=True)
+        
+        if "v_proj" in peft_config.target_modules:
+            self.v_proj_alpha_params = nn.Parameter(torch.rand(len(peft_config.search_space), dtype=torch.float16), requires_grad=True)
+            
+        if "o_proj" in peft_config.target_modules:
+            self.o_proj_alpha_params = nn.Parameter(torch.rand(len(peft_config.search_space), dtype=torch.float16), requires_grad=True)
+
+
     def get_sampled_network(self, peft_config):
         if "q_proj" in peft_config.target_modules:
             self.q_proj.get_sampled_network(peft_config)
@@ -844,6 +900,17 @@ class MllamaTextMLP(nn.Module):
         # Ignore copy
         self.act_fn = ACT2FN[config.hidden_act]
 
+    def initalize_lora_params(self, peft_config):
+        if "gate_proj" in peft_config.target_modules:
+            self.gate_proj.initalize_lora_params(peft_config)
+        
+        if "up_proj" in peft_config.target_modules:
+            self.up_proj.initalize_lora_params(peft_config)
+        
+        if "down_proj" in peft_config.target_modules:
+            self.down_proj.initalize_lora_params(peft_config)
+        
+
     def get_sampled_network(self, peft_config):
         if "gate_proj" in peft_config.target_modules:
             self.gate_proj.get_sampled_network(peft_config)
@@ -884,6 +951,10 @@ class MllamaSelfAttentionDecoderLayer(nn.Module):
         self.post_attention_layernorm = MllamaTextRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
         self.layer_idx = layer_idx
+
+    def initalize_lora_params(self, peft_config):
+        self.self_attn.initalize_lora_params(peft_config)
+        self.mlp.initalize_lora_params(peft_config)
 
     def get_sampled_network(self, peft_config):
         self.self_attn.get_sampled_network(peft_config)
@@ -958,6 +1029,11 @@ class MllamaCrossAttentionDecoderLayer(torch.nn.Module):
         self.mlp = MllamaTextMLP(config)
         self.post_attention_layernorm = MllamaTextRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.cross_attn_mlp_gate = torch.nn.Parameter(torch.zeros(1))
+
+    def initalize_lora_params(self, peft_config):
+        self.cross_attn.initalize_lora_params(peft_config)
+        self.mlp.initalize_lora_params(peft_config)
+        
 
     def get_sampled_network(self, peft_config):
         self.cross_attn.get_sampled_network(peft_config)
@@ -1143,6 +1219,11 @@ class MllamaVisionModel(MllamaPreTrainedModel):
 
         self.post_init()
 
+    def initalize_lora_params(self, peft_config):
+        self.transformer.initalize_lora_params(peft_config)
+        self.global_transformer.initalize_lora_params(peft_config)
+
+
     def get_sampled_network(self, peft_config):
         self.transformer.get_sampled_network(peft_config)
         self.global_transformer.get_sampled_network(peft_config)
@@ -1320,6 +1401,11 @@ class MllamaTextModel(MllamaPreTrainedModel):
         self.gradient_checkpointing = False
         self.post_init()
     
+    def initalize_lora_params(self, peft_config):
+        for layer in self.layers:
+            layer.initalize_lora_params(peft_config)
+            
+
     def get_sampled_network(self, peft_config):
         for layer in self.layers:
             layer.get_sampled_network(peft_config)
@@ -1564,7 +1650,10 @@ class MllamaForCausalLM(MllamaPreTrainedModel, GenerationMixin):
 
         self.post_init()
 
-    
+    def initalize_lora_params(self, peft_config):
+        self.model.initalize_lora_params(peft_config)
+
+
     def get_sampled_network(self, peft_config):
         self.model.get_sampled_network(peft_config)
 
@@ -1725,6 +1814,11 @@ class MllamaForConditionalGeneration(MllamaPreTrainedModel, GenerationMixin):
             bias=True,
         )
         self.post_init()
+
+    def initalize_lora_params(self, peft_config):
+        self.vision_model.initalize_lora_params(peft_config)
+        self.language_model.initalize_lora_params(peft_config)
+
 
     def get_sampled_network(self, peft_config):
         self.vision_model.get_sampled_network(peft_config)

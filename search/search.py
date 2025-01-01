@@ -13,8 +13,6 @@ import torch
 import torch.optim as optim
 from accelerate.utils import is_xpu_available
 
-from utils.search_utils import get_named_parameters
-
 from configs import (
     fsdp_config as FSDP_CONFIG,
     quantization_config as QUANTIZATION_CONFIG,
@@ -37,6 +35,7 @@ from utils.dataset_utils import (
 )
 
 from utils.fsdp_utils import hsdp_device_mesh
+from utils.search_utils import search
 from utils.train_utils import (
     clear_gpu_cache,
     freeze_transformer_layers,
@@ -61,8 +60,7 @@ from transformers import (
     BitsAndBytesConfig,
     LlamaForCausalLM,
 )
-
-from models.dense_models.mllama.modeling_mllama_supernet import MllamaForConditionalGeneration 
+ 
 
 from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 
@@ -71,6 +69,8 @@ from transformers.models.mllama.modeling_mllama import (
     MllamaSelfAttentionDecoderLayer,
     MllamaVisionEncoderLayer,
 )
+
+from transformers import MllamaForConditionalGeneration
 
 
 def setup_wandb(train_config, fsdp_config, **kwargs):
@@ -145,6 +145,8 @@ def main(**kwargs):
     if config.model_type == "mllama":
         is_vision = True
         
+        
+
         model = MllamaForConditionalGeneration.from_pretrained(
             train_config.model_name,
             quantization_config=bnb_config,
@@ -216,19 +218,15 @@ def main(**kwargs):
             peft_config = model.peft_config
             
         else:
+
             from peft_custom_utils import get_peft_model
             peft_config = generate_peft_config(train_config, kwargs)
             
             peft_config.lora_bias = None
             peft_config.search_space = [8, 16, 32, 64]
-            peft_config.supernet = False
+            peft_config.supernet = True
 
-            model = get_peft_model(model, peft_config)
-            model.get_sampled_network(peft_config)
-
-            # if rank == 0:
-            #     print(model)
-            exit()
+            model = get_peft_model(model, peft_config, search_space = peft_config.search_space)
         
         if wandb_run:
             wandb_run.config.update(peft_config)
@@ -238,8 +236,6 @@ def main(**kwargs):
         print(
             f"trainable params: {trainable_params:,d} || all params: {all_param:,d} || trainable%: {100 * trainable_params / all_param:.4f}"
         )
-        exit()
-
 
     hsdp_device_mesh_plan = None
     if (
@@ -252,6 +248,7 @@ def main(**kwargs):
         )
         print("HSDP device mesh is ready")
 
+
     if train_config.enable_fsdp:
         check_fsdp_config(fsdp_config)
 
@@ -262,8 +259,10 @@ def main(**kwargs):
         if not train_config.use_peft and train_config.freeze_LLM_only and config.model_type == "mllama":
             freeze_LLM_only(model)
             print_frozen_model_status(model, train_config, rank if train_config.enable_fsdp else 0)
+
         
         mixed_precision_policy, wrapping_policy = get_policies(fsdp_config, rank)
+        
         if is_vision:
             my_auto_wrapping_policy = fsdp_auto_wrap_policy(
                 model,
@@ -285,6 +284,8 @@ def main(**kwargs):
             use_orig_params = True
         else:
             use_orig_params = False
+
+        # use_orig_params = True
         model = FSDP(
             model,
             auto_wrap_policy=(
@@ -417,6 +418,38 @@ def main(**kwargs):
         )
     scheduler = StepLR(optimizer, step_size=1, gamma=train_config.gamma)
     
+    alpha_params, lora_weight_params = [], []
+    
+    for name, param in model.named_parameters():
+        if 'alpha' in name:
+            alpha_params += [param]
+        
+        if 'lora' in name:
+            if param.requires_grad:
+                lora_weight_params += [param]
+
+    print("alpha_params", alpha_params)
+    # print("lora_weight_params", lora_weight_params)
+    exit()
+
+    search(
+        model,
+        train_dataloader,
+        train_config.gradient_accumulation_steps,
+        train_config,
+        fsdp_config if train_config.enable_fsdp else None,
+        local_rank if train_config.enable_fsdp else None,
+        rank if train_config.enable_fsdp else None,
+        wandb_run,
+    )
+
+    for name, module in model.named_modules():
+        if name.split('.')[-1] in peft_config.target_modules:
+            if hasattr(module, "get_sampled_network") and callable(getattr(module, "get_sampled_network")):
+                module.get_sampled_network()
+    
+    exit()
+
     results = train(
         model,
         train_dataloader,
@@ -441,6 +474,11 @@ def main(**kwargs):
             for k, v in results.items():
                 wandb_run.summary[k] = v
 
+    model.get_sampled_network(peft_config)
+    model.save_pretrained(train_config.finetune_model_dir)
+
+    exit()
+
     del model
 
     model = MllamaForConditionalGeneration.from_pretrained(
@@ -458,9 +496,7 @@ def main(**kwargs):
     from peft import PeftModel
     lora_model = PeftModel.from_pretrained(model, train_config.output_dir)
     merged_model = lora_model.merge_and_unload()
-    print("merged_model", merged_model)
-
-    merged_model.save_pretrained(train_config.finetune_model_dir)
+    
     # merged_model.push_to_hub(train_config.HF_repo)
 
     return results, train_config, peft_config

@@ -53,4 +53,5 @@ class train_config:
     lora_adapters: str = 'qkv' # LoRA Adapters
     finetune_model_dir: str = "/lus/grand/projects/datascience/krishnat/krishnat_HF_weights/Llama-3.2-11B-Vision-ocrvqa-finetuned" # finetune_model_dir
     HF_repo: str = "krishnateja95/Llama-3.2-11B-Vision-ocrvqa-finetuned" # HF_repo
+    num_search_epochs: int = 1 
     

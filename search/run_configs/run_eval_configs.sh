@@ -9,7 +9,7 @@ export HF_HOME="/lus/grand/projects/datascience/krishnat/model_weights/LLaMA/lla
 cd ../ 
 
 for rank in 8; do
-    for lora_adapters in "qkv"; do 
+    for lora_adapters in "qkvogudfc"; do 
         torchrun --nnodes 1 --nproc_per_node 4 main_file.py \
                                                 --enable_fsdp \
                                                 --lr 1e-5 \
@@ -31,7 +31,8 @@ for rank in 8; do
                                                 --lora_rank $rank \
                                                 --lora_adapters $lora_adapters \
                                                 --finetune_model_dir "/lus/grand/projects/datascience/krishnat/krishnat_HF_weights/Llama-3.2-11B-Vision-finetuned" \
-                                                --HF_repo "krishnateja95/Llama-3.2-11B-Vision-ocrvqa-finetuned"
+                                                --HF_repo "krishnateja95/Llama-3.2-11B-Vision-ocrvqa-finetuned" \
+                                                --use_fp16
     done
 done
 

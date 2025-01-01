@@ -1,7 +1,2 @@
 Hardware,Num of Hardware,Model,Trainable,All params,Dataset,target_modules,LoRA Rank,Avg Epoch Time,Eval PPL
 
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,265.16847674991004,1.4077712297439575
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,260.33857855398674,1.408085823059082
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,264.10045184299815,1.4080880880355835
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,257.84119108505547,1.4077072143554688
-Nvidia A100 GPU,4,meta-llama/Llama-3.2-11B-Vision-Instruct,26050560,10696271395,ocrvqa,"['q_proj', 'k_proj', 'v_proj', 'gate_proj', 'up_proj', 'down_proj']",8,251.99565235804766,1.4082624912261963

@@ -227,15 +227,19 @@ def main(**kwargs):
             peft_config.supernet = True
 
             model = get_peft_model(model, peft_config, search_space = peft_config.search_space)
+
+            for name, param in model.named_parameters():
+                if rank == 0:
+                    print(name)
+
+            exit()
         
         if wandb_run:
             wandb_run.config.update(peft_config)
         
         trainable_params, all_param, trainable_params_percent = get_nb_trainable_parameters(model)
 
-        print(
-            f"trainable params: {trainable_params:,d} || all params: {all_param:,d} || trainable%: {100 * trainable_params / all_param:.4f}"
-        )
+        print(f"trainable params: {trainable_params:,d} || all params: {all_param:,d} || trainable%: {100 * trainable_params / all_param:.4f}")
 
     hsdp_device_mesh_plan = None
     if (
@@ -421,6 +425,10 @@ def main(**kwargs):
     alpha_params, lora_weight_params = [], []
     
     for name, param in model.named_parameters():
+        
+        if rank == 0:
+            print(name)
+
         if 'alpha' in name:
             alpha_params += [param]
         

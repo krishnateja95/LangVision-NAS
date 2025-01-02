@@ -18,6 +18,9 @@ from peft.utils.other import transpose
 from .config import LoraConfig
 from .dora import DoraConv2dLayer, DoraConv3dLayer, DoraEmbeddingLayer, DoraLinearLayer, _DoraConvNdLayer
 
+from torch.nn import Parameter
+
+
 class LoraLayer(BaseTunerLayer):
     adapter_layer_names = ("lora_A", "lora_B", "lora_embedding_A", "lora_embedding_B")
     other_param_names = ("r", "lora_alpha", "scaling", "lora_dropout")
@@ -85,6 +88,8 @@ class LoraLayer(BaseTunerLayer):
         self.in_features = in_features
         self.out_features = out_features
 
+        # self.alpha_params = nn.ParameterDict({})
+
 
     def update_superlayer(self, adapter_name, r, lora_alpha, lora_dropout, init_lora_weights, use_rslora, search_space, use_dora: bool = False, lora_bias: bool = False):
 
@@ -131,13 +136,22 @@ class LoraLayer(BaseTunerLayer):
 
         self.set_adapter(self.active_adapters)
 
-        self.alpha_params = nn.Parameter(torch.rand(len(search_space), dtype = torch.float16), requires_grad=True)
-        print("self.alpha_params")
-        exit()
+        self.alpha_params = Parameter(torch.randn(len(search_space), dtype = torch.float16) )
+
+        # self.alpha_params = nn.Parameter(torch.rand(len(search_space), dtype = torch.float16), requires_grad=True)
+
+        # self.alpha_params[adapter_name] = nn.Parameter(torch.rand(len(search_space), dtype = torch.float16), requires_grad=True)
+
+        # self.alpha_params = nn.ParameterList([nn.Parameter(torch.rand(1, dtype=torch.float16), 
+        #                                                    requires_grad=True) for _ in range(len(search_space))])
+
+        # print(self.alpha_params)
+        # print("self.alpha_params")
+        
         # # self.alpha_params.to(dtype = torch.float16)
 
         # # self.alpha_params = nn.Parameter(torch.rand(len(search_space), dtype=torch.float16), requires_grad=True)
-        # # self.register_parameter("alpha_params", nn.Parameter(torch.rand(len(search_space), dtype=torch.float16)))
+        # self.register_parameter("alpha_params", nn.Parameter(torch.rand(len(search_space), dtype=torch.float16)))
 
         # self.alpha_params = torch.rand(len(search_space), dtype=torch.float16, requires_grad=True)
         self.if_supernet = True

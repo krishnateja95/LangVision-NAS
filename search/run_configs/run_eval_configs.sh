@@ -1,10 +1,12 @@
 
 module use /soft/modulefiles/
-module load conda
+# module load conda
 
-conda activate LLaMA_Finetune_bench
+conda init
+conda activate h100_kv_cache
 
-export HF_HOME="/lus/grand/projects/datascience/krishnat/model_weights/LLaMA/llama_cache"
+# export HF_HOME="/lus/grand/projects/datascience/krishnat/model_weights/LLaMA/llama_cache"
+export HF_HOME='/vast/users/schittyvenkata/model_weights/'
 
 cd ../ 
 

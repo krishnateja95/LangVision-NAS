@@ -18,9 +18,13 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from peft.utils.integrations import dequantize_module_weight, gather_params_ctx
-from peft.utils.other import transpose
+# from peft.utils.integrations import dequantize_module_weight, gather_params_ctx
+# from peft.utils.other import transpose
 
+
+# from peft_custom_utils.tuners.tuners_utils import BaseTunerLayer, check_adapters_to_merge
+from peft_custom_utils.utils.integrations import dequantize_bnb_weight, gather_params_ctx
+from peft_custom_utils.utils.other import transpose
 
 class DoraLinearLayer(nn.Module):
     def __init__(self, fan_in_fan_out):

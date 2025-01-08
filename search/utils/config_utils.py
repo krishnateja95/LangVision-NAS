@@ -7,11 +7,19 @@ from dataclasses import asdict
 import torch.distributed as dist
 from torch.distributed.fsdp.fully_sharded_data_parallel import StateDictType
 from torch.utils.data import DistributedSampler
-from peft import (
-    LoraConfig,
-    AdaptionPromptConfig,
-    PrefixTuningConfig,
-)
+
+from peft_custom_utils.tuners.lora import LoraConfig
+from peft_custom_utils.tuners.adaption_prompt.config import AdaptionPromptConfig
+from peft_custom_utils.tuners.prefix_config.config import PrefixTuningConfig
+
+
+# , AdaptionPromptConfig, PrefixTuningConfig
+
+# from peft import (
+#     LoraConfig,
+#     AdaptionPromptConfig,
+#     PrefixTuningConfig,
+# )
 from transformers import default_data_collator
 from transformers.data import DataCollatorForSeq2Seq
 

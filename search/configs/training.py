@@ -1,8 +1,8 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # This software may be used and distributed according to the terms of the Llama 2 Community License Agreement.
 
-from dataclasses import dataclass
-
+from dataclasses import dataclass, field
+from typing import List
 
 @dataclass
 class train_config:
@@ -53,5 +53,7 @@ class train_config:
     lora_adapters: str = 'qkv' # LoRA Adapters
     finetune_model_dir: str = "/lus/grand/projects/datascience/krishnat/krishnat_HF_weights/Llama-3.2-11B-Vision-ocrvqa-finetuned" # finetune_model_dir
     HF_repo: str = "krishnateja95/Llama-3.2-11B-Vision-ocrvqa-finetuned" # HF_repo
-    num_search_epochs: int = 1 
-    
+    num_search_epochs: int = 1
+    search_batch_size_training: int = 1
+    searched_network_file: str = "file.json"
+    lora_search_space: List[int] = field(default_factory=lambda: [4, 8, 16, 32, 64])

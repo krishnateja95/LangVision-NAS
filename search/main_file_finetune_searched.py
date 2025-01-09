@@ -1,8 +1,9 @@
+
 # Copyright (c) Meta Platforms, Inc. and affiliates.
 # This software may be used and distributed according to the terms of the Llama 2 Community License Agreement.
 
 import fire
-from search import main
+from finetune_searched import main
 
 if __name__ == "__main__":
 

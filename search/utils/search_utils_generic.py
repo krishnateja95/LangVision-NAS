@@ -36,57 +36,46 @@ def set_tokenizer_params(tokenizer: LlamaTokenizer):
 
 def update_weights(model, batch, train_config, local_rank,
                    autocast, gradient_accumulation_steps, scaler,
-                   step, dataloader, optimizer, pbar):
+                   step, dataloader, lora_optimizer, pbar):
     
     for key in batch.keys():
-        if train_config.enable_fsdp:
-            if is_xpu_available():
-                batch[key] = batch[key].to(torch.device(f"xpu:{local_rank}"))
-            else:
-                batch[key] = batch[key].to(local_rank)
-        else:
-            if is_xpu_available():
-                batch[key] = batch[key].to('xpu:0')
-            elif torch.cuda.is_available():
-                batch[key] = batch[key].to('cuda:0')
-    
+        if is_xpu_available():
+            batch[key] = batch[key].to('xpu:0')
+        elif torch.cuda.is_available():
+            batch[key] = batch[key].to('cuda:0')
+
     with autocast():
         loss = model(**batch).loss
-    # total_loss += loss.detach().float()
-    # loss = loss / gradient_accumulation_steps
+    total_loss += loss.detach().float()
+    loss = loss / gradient_accumulation_steps
     
     if train_config.use_fp16:
         scaler.scale(loss).backward()
-        # if (step + 1) % gradient_accumulation_steps == 0 or step == len(dataloader) - 1:
-        if train_config.gradient_clipping and train_config.gradient_clipping_threshold > 0.0:
-            scaler.unscale_(optimizer)
-            if train_config.enable_fsdp:
-                model.clip_grad_norm_(train_config.gradient_clipping_threshold)
-            else:
+        if (step + 1) % gradient_accumulation_steps == 0 or step == len(dataloader) - 1:
+            if train_config.gradient_clipping and train_config.gradient_clipping_threshold > 0.0:
+                scaler.unscale_(lora_optimizer)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), train_config.gradient_clipping_threshold)
-        scaler.step(optimizer)
-        scaler.update()
-        optimizer.zero_grad()
-        
+            scaler.step(lora_optimizer)
+            scaler.update()
+            lora_optimizer.zero_grad()
+            
     else:
         loss.backward()
-        # if (step + 1) % gradient_accumulation_steps == 0 or step == len(dataloader) - 1:
-        if train_config.gradient_clipping and train_config.gradient_clipping_threshold > 0.0:
-            if train_config.enable_fsdp:
-                model.clip_grad_norm_(train_config.gradient_clipping_threshold)
-            else:
+        if (step + 1) % gradient_accumulation_steps == 0 or step == len(dataloader) - 1:
+            if train_config.gradient_clipping and train_config.gradient_clipping_threshold > 0.0:
                 torch.nn.utils.clip_grad_norm_(model.parameters(), train_config.gradient_clipping_threshold)
-        optimizer.step()
-        optimizer.zero_grad()
-        
+            lora_optimizer.step()
+            lora_optimizer.zero_grad()
+            
     pbar.update(1)
     
 
 
 
-def search(model, train_dataloader, eval_dataloader, gradient_accumulation_steps, train_config, fsdp_config=None, local_rank=None, rank=None, wandb_run=None):
+def search(model, train_dataloader, gradient_accumulation_steps, train_config, fsdp_config=None, local_rank=None, rank=None, wandb_run=None):
         
     alpha_params, lora_weight_params = [], []
+    
     for name, param in model.named_parameters():
         if 'alpha' in name:
             alpha_params += [param]
@@ -111,7 +100,6 @@ def search(model, train_dataloader, eval_dataloader, gradient_accumulation_steps
                                       weight_decay=train_config.weight_decay)
         
     else:
-        print("alpha_optimizer")
         alpha_optimizer = optim.AdamW(alpha_params,
                                 lr=train_config.lr,
                                 weight_decay=train_config.weight_decay)
@@ -122,14 +110,16 @@ def search(model, train_dataloader, eval_dataloader, gradient_accumulation_steps
     
     lr_scheduler = StepLR(lora_optimizer, step_size=1, gamma=train_config.gamma)
     
-    if train_config.use_fp16 and train_config.enable_fsdp:
-        scaler = ShardedGradScaler()
-    elif train_config.use_fp16 and not train_config.enable_fsdp:
-        scaler = torch.cuda.amp.GradScaler()
-    if train_config.enable_fsdp:
-        world_size = int(os.environ["WORLD_SIZE"])
+    # if train_config.use_fp16 and train_config.enable_fsdp:
+    #     scaler = ShardedGradScaler()
+    # elif train_config.use_fp16 and not train_config.enable_fsdp:
+    scaler = torch.cuda.amp.GradScaler()
+    
+    # if train_config.enable_fsdp:
+    #     world_size = int(os.environ["WORLD_SIZE"])
 
     autocast = torch.cuda.amp.autocast if train_config.use_fp16 else nullcontext
+
     for epoch in range(train_config.num_search_epochs):
         print(f"Starting epoch {epoch}/{train_config.num_epochs}")
         
@@ -138,18 +128,22 @@ def search(model, train_dataloader, eval_dataloader, gradient_accumulation_steps
             total_loss = 0.0
             total_length = len(train_dataloader)//gradient_accumulation_steps
             pbar = tqdm(colour="blue", desc=f"Training Epoch: {epoch+1}", total=total_length, dynamic_ncols=True)
-
+            
             for step, batch in enumerate(train_dataloader):
-                update_weights(model, batch, train_config, local_rank,
+                
+                split_index = int(len(batch) * 0.75)
+
+                mini_batch_1 = batch[0:split_index] 
+                mini_batch_2 = batch[split_index:]
+
+                update_weights(model, mini_batch_1, train_config, local_rank,
                    autocast, gradient_accumulation_steps, scaler,
                    step, train_dataloader, lora_optimizer, pbar)
                 
-            # for step, batch in enumerate(eval_dataloader):
-                update_weights(model, batch, train_config, local_rank,
+                update_weights(model, mini_batch_2, train_config, local_rank,
                    autocast, gradient_accumulation_steps, scaler,
                    step, train_dataloader, alpha_optimizer, pbar)
                 
-                lr_scheduler.step()
                 pbar.update(1)
                 
                 # for key in batch.keys():
@@ -194,15 +188,14 @@ def search(model, train_dataloader, eval_dataloader, gradient_accumulation_steps
                 #         lora_optimizer.zero_grad()
                 #         pbar.update(1)
             pbar.close()
-            # memtrace.print_stats()
 
         # if is_xpu_available() and (torch.xpu.device_count() > 1 and train_config.enable_fsdp):
         #     dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
         # elif torch.cuda.device_count() > 1 and train_config.enable_fsdp:
         #     dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)
         
-        # if not train_config.enable_fsdp or rank==0:
-            
+        if rank==0:
+            memtrace.print_stats()
 
-        
+        lr_scheduler.step()
         

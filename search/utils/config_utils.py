@@ -72,7 +72,8 @@ def generate_peft_config(train_config, kwargs):
     
     peft_config.r = train_config.lora_rank
     
-    adapter_dict = {"q": "q_proj",
+    adapter_dict = {"a": "qkv",
+                    "q": "q_proj",
                     "k": "k_proj",
                     "v": "v_proj",
                     "o": "o_proj",

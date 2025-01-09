@@ -49,9 +49,9 @@ def tokenize_dialogs(dialogs, images, processor):
     return batch
 
 
-def get_custom_dataset(dataset_config, processor, split, split_ratio=0.9):
+def get_custom_dataset(dataset_config, processor, split, name="ocrvqa", split_ratio=0.9):
     # load_dataset will return DatasetDict that contains all the data in the train set
-    dataset_dict = load_dataset("HuggingFaceM4/the_cauldron", name="ocrvqa")
+    dataset_dict = load_dataset("HuggingFaceM4/the_cauldron", name=name)
     dataset = dataset_dict['train']
     # Comment out the following line to use the full dataset, for quick testing only use 2000 samples
     dataset = dataset.select(range(2000))

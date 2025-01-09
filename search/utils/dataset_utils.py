@@ -11,9 +11,7 @@ from custom_data import DATASET_PREPROC, DATALOADER_COLLATE_FUNC
 from utils.config_utils import get_dataloader_kwargs
 
 
-def get_preprocessed_dataset(
-    tokenizer, dataset_config, split: str = "train"
-) -> torch.utils.data.Dataset:
+def get_preprocessed_dataset(tokenizer, dataset_config, split: str = "train"):
     if not dataset_config.dataset in DATASET_PREPROC:
         raise NotImplementedError(f"{dataset_config.dataset} is not (yet) implemented")
 

@@ -43,6 +43,9 @@ class LoraLayer(BaseTunerLayer):
         
         self.lora_embedding_A = nn.ParameterDict({})
         self.lora_embedding_B = nn.ParameterDict({})
+
+        # self.lora_alpha = nn.ParameterDict({})
+
         
         self._disable_adapters = False
         self.merged_adapters = []
@@ -114,6 +117,10 @@ class LoraLayer(BaseTunerLayer):
         self.lora_B[adapter_name] = nn.Linear(self.max_r, self.out_features, bias=lora_bias)
         self.lora_bias[adapter_name] = lora_bias
 
+        self.lora_alpha_param = Parameter(torch.randn(len(search_space), 
+                                                    #   dtype = torch.float16
+                                                    ))
+
         if use_rslora:
             self.scaling[adapter_name] = lora_alpha / math.sqrt(self.max_r)
         else:
@@ -143,24 +150,6 @@ class LoraLayer(BaseTunerLayer):
 
         self.set_adapter(self.active_adapters)
 
-        self.alpha_params = Parameter(torch.randn(len(search_space), dtype = torch.float16) )
-
-        # self.alpha_params = nn.Parameter(torch.rand(len(search_space), dtype = torch.float16), requires_grad=True)
-
-        # self.alpha_params[adapter_name] = nn.Parameter(torch.rand(len(search_space), dtype = torch.float16), requires_grad=True)
-
-        # self.alpha_params = nn.ParameterList([nn.Parameter(torch.rand(1, dtype=torch.float16), 
-        #                                                    requires_grad=True) for _ in range(len(search_space))])
-
-        # print(self.alpha_params)
-        # print("self.alpha_params")
-        
-        # # self.alpha_params.to(dtype = torch.float16)
-
-        # # self.alpha_params = nn.Parameter(torch.rand(len(search_space), dtype=torch.float16), requires_grad=True)
-        # self.register_parameter("alpha_params", nn.Parameter(torch.rand(len(search_space), dtype=torch.float16)))
-
-        # self.alpha_params = torch.rand(len(search_space), dtype=torch.float16, requires_grad=True)
         self.if_supernet = True
         
         self.A_bias = None
@@ -636,35 +625,97 @@ class Linear(nn.Module, LoraLayer):
 
         return result
 
-    def forward_supernet(self, inp_tensor, lora_A, lora_B, scaling, dropout):
-        alphas = F.softmax(self.alpha_params, dim=0) 
-            
-        super_weight_A = torch.zeros_like(lora_A.weight)
-        super_weight_B = torch.zeros_like(lora_B.weight)
 
+    def forward_supernet(self, inp_tensor, lora_A, lora_B, scaling, dropout):
+        alphas = F.softmax(self.lora_alpha_param, dim=0)
+        inp_tensor = dropout(inp_tensor)
+
+        super_weight = None
         for i, (neurons, alpha_param) in enumerate(zip(self.search_space, alphas)):
             start_idx = (self.max_r - neurons) // 2
             end_idx = start_idx + neurons
-
+            
             partial_weight_A = lora_A.weight.clone()
             partial_weight_A[:start_idx, :] = 0
             partial_weight_A[end_idx:, :] = 0
             partial_weight_A[start_idx:end_idx, :] *= alpha_param
-            super_weight_A += partial_weight_A
+            
+            if super_weight is None:
+                super_weight = partial_weight_A
+            else:
+                super_weight += partial_weight_A
+            
+            del partial_weight_A
+            torch.cuda.empty_cache()
+
+        inp_tensor = F.linear(inp_tensor, super_weight, self.A_bias)
+        del super_weight
+        torch.cuda.empty_cache()
+
+        # Dynamically compute `super_weight` for lora_B
+        super_weight = None
+        for i, (neurons, alpha_param) in enumerate(zip(self.search_space, alphas)):
+            start_idx = (self.max_r - neurons) // 2
+            end_idx = start_idx + neurons
 
             partial_weight_B = lora_B.weight.clone()
             partial_weight_B[:, :start_idx] = 0
             partial_weight_B[:, end_idx:] = 0
             partial_weight_B[:, start_idx:end_idx] *= alpha_param
-            super_weight_B += partial_weight_B
+
+            if super_weight is None:
+                super_weight = partial_weight_B
+            else:
+                super_weight += partial_weight_B
+
+            del partial_weight_B  # Explicitly delete after use
+            torch.cuda.empty_cache()
+
+        return F.linear(inp_tensor, super_weight, self.B_bias) * scaling
+
+
+
+    # def forward_supernet(self, inp_tensor, lora_A, lora_B, scaling, dropout):
         
-        return F.linear(F.linear(dropout(inp_tensor), super_weight_A, self.A_bias), super_weight_B, self.B_bias) * scaling
+    #     alphas = F.softmax(self.lora_alpha_param, dim=0)
+    #     inp_tensor = dropout(inp_tensor)
 
+    #     super_weight = torch.zeros_like(lora_A.weight)
+        
+    #     for i, (neurons, alpha_param) in enumerate(zip(self.search_space, alphas)):
+    #         start_idx = (self.max_r - neurons) // 2
+    #         end_idx = start_idx + neurons
 
+    #         partial_weight_A = lora_A.weight.clone()
+    #         partial_weight_A[:start_idx, :] = 0
+    #         partial_weight_A[end_idx:, :] = 0
+    #         partial_weight_A[start_idx:end_idx, :] *= alpha_param
+    #         super_weight += partial_weight_A
+            
+    #     del partial_weight_A
+    #     inp_tensor = F.linear(inp_tensor, super_weight, self.A_bias)
+
+    #     super_weight = torch.zeros_like(lora_B.weight)
+
+    #     for i, (neurons, alpha_param) in enumerate(zip(self.search_space, alphas)):
+    #         start_idx = (self.max_r - neurons) // 2
+    #         end_idx = start_idx + neurons
+
+    #         partial_weight_B = lora_B.weight.clone()
+    #         partial_weight_B[:, :start_idx] = 0
+    #         partial_weight_B[:, end_idx:] = 0
+    #         partial_weight_B[:, start_idx:end_idx] *= alpha_param
+    #         super_weight += partial_weight_B
+        
+    #     del partial_weight_B
+    #     return F.linear(inp_tensor, super_weight, self.B_bias) * scaling
+
+    def get_sampled_rank(self):
+        return self.sampled_rank 
     
     def get_sampled_network(self):
         
-        best_alpha_index = torch.argmax(self.alpha_params)
+        best_alpha_index = torch.argmax(self.lora_alpha_param)
         sampled_rank = self.search_space[best_alpha_index]
 
         start_idx = (self.max_r - sampled_rank) // 2
@@ -684,9 +735,9 @@ class Linear(nn.Module, LoraLayer):
         else:
             self.scaling["default"] = self.lora_alpha["default"] / sampled_rank
 
-        self.if_supernet = False
-
-        del self.alpha_params
+        self.if_supernet  = False
+        self.sampled_rank = sampled_rank
+        del self.lora_alpha_param
 
     def __repr__(self) -> str:
         rep = super().__repr__()

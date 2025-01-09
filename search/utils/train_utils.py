@@ -107,6 +107,7 @@ def train(model, train_dataloader,eval_dataloader, tokenizer, optimizer, lr_sche
         epoch_start_time = time.perf_counter()
         with MemoryTrace() as memtrace:
             model.train()
+            
             total_loss = 0.0
             total_length = len(train_dataloader)//gradient_accumulation_steps
             pbar = tqdm(colour="blue", desc=f"Training Epoch: {epoch+1}", total=total_length, dynamic_ncols=True)
@@ -344,9 +345,7 @@ def evaluation(model,train_config, eval_dataloader, local_rank, tokenizer, wandb
                 eval_loss += loss.detach().float()
             
             preds = torch.argmax(outputs.logits, -1)
-            eval_preds.extend(
-                tokenizer.batch_decode(preds.detach().cpu().numpy(), skip_special_tokens=True)
-            )
+            eval_preds.extend(tokenizer.batch_decode(preds.detach().cpu().numpy(), skip_special_tokens=True))
     
     if is_xpu_available() and (torch.xpu.device_count() > 1 and train_config.enable_fsdp):
         dist.all_reduce(eval_loss, op=dist.ReduceOp.SUM)

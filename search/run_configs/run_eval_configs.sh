@@ -11,6 +11,7 @@ export HF_HOME='/vast/users/schittyvenkata/model_weights/'
 
 export HF_AUTH_TOKEN="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"
 export HUGGINGFACE_TOKEN="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"
+export HF_TOKEN="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"
 
 cd ../ 
 
